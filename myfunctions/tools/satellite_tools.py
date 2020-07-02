@@ -87,14 +87,15 @@ class Satellite_tools:
         ax = plt.gca()
         im = ax.imshow(ndvi, vmin=-1, vmax=1, cmap='RdYlGn')
         #plot
-        plt.title('NDVI in Analysis area')
+        plt.title('NDVI in Analysis area for date ' + date)
         plt.xlabel('Latitude')
         plt.ylabel('Longitude')
         #to locate colorbar
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(im, cax=cax)
-        plt.savefig(dest_folder+analysis_area+'/'+date[:8]+destination,bbox_inches='tight',dpi=500)
+        plt.savefig(dest_folder+analysis_area+'/'+destination,bbox_inches='tight',dpi=500)
+        plt.clf()
         
     def trns_coor(area,meta):
         x, y = meta['transform'][2]+area[0]*10, meta['transform'][5]+area[1]*-10

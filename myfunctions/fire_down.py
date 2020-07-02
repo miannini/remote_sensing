@@ -8,11 +8,28 @@ import matplotlib.pyplot as plt
 import shapefile
 from pyproj import Proj, transform
 from sentinelhub import BBox, CRS
+import time
 
 firebase = firebase.FirebaseApplication('https://proyectopiloto-28591.firebaseio.com/', None)
 
 class Fire_down:
-	def find_poly(user_analysis):        
+	def find_poly():
+         alldb = firebase.get('coordinatesUser/', None)
+         pending = []
+         for item in alldb.items(): #itera por la bd
+             usuario = item[0]
+             for item_terreno in item[1].values():
+                 try:
+                     if item_terreno['status'] == "Pendiente":
+                         pending.append(dict({"user" : usuario , "terrain": item_terreno['uid'], "timestamp" : item_terreno['timestamp']})) 
+                 except:
+                     pass
+         pending = sorted(pending, key = lambda i: i['timestamp'],reverse=True)
+         user_analysis = pending[0]['user']+"/"+pending[0]['terrain']
+         request_date = firebase.get('coordinatesUser/'+user_analysis+'/timestamp', None) #Conseguir fecha
+         time_window = firebase.get('coordinatesUser/'+user_analysis+'/years', None) #Conseguir ventana de tiempo
+         Date_Ini = time.strftime('%Y-%m-%d', time.gmtime((int(request_date)/1000) - (int(time_window))*31536000))
+         Date_Fin = time.strftime('%Y-%m-%d', time.gmtime(int(request_date)/1000))
          result = firebase.get('/coordinatesUser/'+user_analysis+'/Coordenadas', None)
          lote_aoi = Polygon(result)
          polygons = []
@@ -49,4 +66,4 @@ class Fire_down:
          bbox_coords_wgs84 = [x1,y2,x2,y1]
          bounding_box = BBox(bbox_coords_wgs84, crs=CRS.WGS84)
 
-         return lote_aoi, lote_aoi_loc, minx,maxx,miny,maxy, bounding_box
+         return lote_aoi, lote_aoi_loc, minx,maxx,miny,maxy, bounding_box, user_analysis,analysis_area, Date_Ini, Date_Fin
