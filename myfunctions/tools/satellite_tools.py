@@ -5,7 +5,11 @@ from rasterio.mask import mask
 from osgeo import gdal_array
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import cv2
+#import math
 #from rasterio.mask import mask
+#Define custom fucntions to compare bands
+#more complex than rest
 
 class Satellite_tools:
     def crop_sat(folder, name, aoi, analysis_area):
@@ -50,7 +54,7 @@ class Satellite_tools:
         output = gdal_array.SaveArray(clouds_data[ind_mask], "Output_Images/"+analysis_area+'/'+date[:8]+"_cldmsk.tif", format="GTiff", prototype=src)
         return x_width, y_height
     
-    def ndvi_calc(date, analysis_area):
+    def ndvi_calc(date, analysis_area,crop):
         # Open b4(red),b8
         msk_cloud = rio.open("Output_Images/"+analysis_area+'/'+date[:8]+"_cldmsk.tif")       
         b4a = rio.open("Output_Images/"+analysis_area+'/'+date[:8]+"B04.tif")
@@ -64,6 +68,12 @@ class Satellite_tools:
         # Calculate NDVI
         ndvi = (nir.astype(float)-red.astype(float))/(nir+red)
         ndvi[cld==1] = None
+        if crop=='grass':
+            lai=0.001*np.exp(8.7343*ndvi.astype(rio.float32))
+            bm = 451.99*lai.astype(rio.float32) + 1870.7
+        else:
+            lai=None
+            bm=None
         msk_cloud.close()
         b4a.close()
         b8a.close()
@@ -76,25 +86,73 @@ class Satellite_tools:
             dst.close()
             b4a.close()
             b8a.close()
+        with rio.open("Output_Images/"+analysis_area+'/'+date[:8]+"_LAI.tif", 'w', **meta) as dst:
+            dst.write(lai.astype(rio.float32))
+            dst.close()
+            b4a.close()
+            b8a.close()
+        with rio.open("Output_Images/"+analysis_area+'/'+date[:8]+"_BM.tif", 'w', **meta) as dst:
+            dst.write(bm.astype(rio.float32))
+            dst.close()
+            b4a.close()
+            b8a.close()
         return meta
     
-    def plot_ndvi(date, analysis_area, source, destination,dest_folder): #source="_NDVI.tif", destination="_NDVI_export.png", dest_folder="Output_Images/"
+    def band_calc(date, analysis_area, band1, band2, name,x_width): #'B04', 'B08', 'NDWI'
+        msk_cloud = rio.open("Output_Images/"+analysis_area+'/'+date[:8]+"_cldmsk.tif")       
+        b1 = rio.open("Output_Images/"+analysis_area+'/'+date[:8]+band1+".tif")
+        b2 = rio.open("Output_Images/"+analysis_area+'/'+date[:8]+band2+".tif")
+        # read Red(b4) and NIR(b8) as arrays
+        b1r = b1.read()
+        b2r = b2.read()
+        cld = msk_cloud.read()
+        # Allow division by zero
+        np.seterr(divide='ignore', invalid='ignore')
+        # Calculate (could be conditional for rest, sum or other complex)
+        calculated = (b1r.astype(float)-b2r.astype(float))/(b1r+b2r)
+        #for bands with 20m resolution, reshape cloud mask to scale size       
+        if x_width > b1.width:
+            img = cv2.imread("Output_Images/"+analysis_area+'/'+date[:8]+"_cldmsk.tif",-1)
+            scale_percent = b1.width/x_width # percent of original size
+            width = int(img.shape[1] * scale_percent)
+            height = int(img.shape[0] * scale_percent)
+            dim = (width, height)
+            resized = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
+            resized = np.expand_dims(resized, axis=0)
+            calculated[resized==1] = None
+        else:
+            calculated[cld==1] = None
+        #calculated[cld==1] = None
+        msk_cloud.close()
+        b1.close()
+        b2.close()
+        # Write the calculated image
+        meta = b1.meta
+        meta.update(driver='GTiff')
+        meta.update(dtype=rio.float32)
+        with rio.open("Output_Images/"+analysis_area+'/'+date[:8]+name+".tif", 'w', **meta) as dst:
+            dst.write(calculated.astype(rio.float32))
+            dst.close()
+            b1.close()
+            b2.close()
+    
+    def plot_ndvi(date, analysis_area, source, destination,dest_folder,cmap,min_loc,max_loc): #source="_NDVI.tif", destination="_NDVI_export.png", dest_folder="Output_Images/", cmap='RdYlGn'
         ndvi_plt = rio.open("Output_Images/"+analysis_area+'/'+date[:8]+source) #"_NDVI.tif"
         ndvi = ndvi_plt.read(1)
         ndvi[ndvi==0] = None
         fig = plt.figure(figsize=(16,16))
         #area chart
         ax = plt.gca()
-        im = ax.imshow(ndvi, vmin=-1, vmax=1, cmap='RdYlGn')
+        im = ax.imshow(ndvi, vmin=min_loc, vmax=max_loc, cmap=cmap) #'RdYlGn'
         #plot
-        plt.title('NDVI in Analysis area for date ' + date)
+        plt.title('NDVI in Analysis area')
         plt.xlabel('Latitude')
         plt.ylabel('Longitude')
         #to locate colorbar
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(im, cax=cax)
-        plt.savefig(dest_folder+analysis_area+'/'+destination,bbox_inches='tight',dpi=500)
+        plt.savefig(dest_folder+analysis_area+'/'+date[:8]+destination,bbox_inches='tight',dpi=500)
         plt.clf()
         
     def trns_coor(area,meta):

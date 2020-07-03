@@ -13,23 +13,26 @@ import time
 firebase = firebase.FirebaseApplication('https://proyectopiloto-28591.firebaseio.com/', None)
 
 class Fire_down:
-	def find_poly():
-         alldb = firebase.get('coordinatesUser/', None)
-         pending = []
-         for item in alldb.items(): #itera por la bd
-             usuario = item[0]
-             for item_terreno in item[1].values():
-                 try:
-                     if item_terreno['status'] == "Pendiente":
-                         pending.append(dict({"user" : usuario , "terrain": item_terreno['uid'], "timestamp" : item_terreno['timestamp']})) 
-                 except:
-                     pass
-         pending = sorted(pending, key = lambda i: i['timestamp'],reverse=True)
-         user_analysis = pending[0]['user']+"/"+pending[0]['terrain']
-         request_date = firebase.get('coordinatesUser/'+user_analysis+'/timestamp', None) #Conseguir fecha
-         time_window = firebase.get('coordinatesUser/'+user_analysis+'/years', None) #Conseguir ventana de tiempo
-         Date_Ini = time.strftime('%Y-%m-%d', time.gmtime((int(request_date)/1000) - (int(time_window))*31536000))
-         Date_Fin = time.strftime('%Y-%m-%d', time.gmtime(int(request_date)/1000))
+	def find_poly(user_analysis,Date_Ini, Date_Fin):
+         if user_analysis == 'no':
+             alldb = firebase.get('coordinatesUser/', None)
+             pending = []
+             for item in alldb.items(): #itera por la bd
+                 usuario = item[0]
+                 for item_terreno in item[1].values():
+                     try:
+                         if item_terreno['status'] == "Pendiente":
+                             pending.append(dict({"user" : usuario , "terrain": item_terreno['uid'], "timestamp" : item_terreno['timestamp']})) 
+                     except:
+                         pass
+             pending = sorted(pending, key = lambda i: i['timestamp'],reverse=True)
+             user_analysis = pending[0]['user']+"/"+pending[0]['terrain']
+         if (Date_Ini == 'no'):
+             request_date = firebase.get('coordinatesUser/'+user_analysis+'/timestamp', None) #Conseguir fecha
+             time_window = firebase.get('coordinatesUser/'+user_analysis+'/years', None) #Conseguir ventana de tiempo
+             Date_Ini = time.strftime('%Y-%m-%d', time.gmtime((int(request_date)/1000) - (int(time_window))*31536000))
+             Date_Fin = time.strftime('%Y-%m-%d', time.gmtime(int(request_date)/1000))
+
          result = firebase.get('/coordinatesUser/'+user_analysis+'/Coordenadas', None)
          lote_aoi = Polygon(result)
          polygons = []

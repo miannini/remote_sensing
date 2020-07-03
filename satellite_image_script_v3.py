@@ -1,6 +1,12 @@
 # USAGE
-# python satellite_image_script_v3.py --download yes
-
+#todo declarado
+# python satellite_image_script_v3.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E --download no --date_ini 2020-01-01 --date_fin 2020-01-31
+#sin declarar nada
+# python satellite_image_script_v3.py
+# declarando solo fecha
+# python satellite_image_script_v3.py --download no --date_ini 2020-01-01 --date_fin 2020-01-31
+# declarando solo user
+# python satellite_image_script_v3.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E --download no
 ## leer librerias
 import numpy as np
 import pandas as pd
@@ -24,40 +30,40 @@ import argparse
 
 ## variables dinamicas para correr en terminal unicamente
 ap = argparse.ArgumentParser()
-'''
-ap.add_argument("-u", "--user", required=True,
+ap.add_argument("-u", "--user", default='no',
 	help="path of working user/terrain")
-'''
 ap.add_argument("-d", "--download", type=str, default='no',
 	help="define if download is required yes/no")
-'''
-ap.add_argument("-i", "--date_ini", type=str, default='2020-01-01',
+ap.add_argument("-i", "--date_ini", type=str, default='no',
 	help="define initial date yyyy-mm-dd")
-ap.add_argument("-f", "--date_fin", type=str, default='2020-02-15',
+ap.add_argument("-f", "--date_fin", type=str, default='no',
 	help="define final date yyyy-mm-dd")
-'''
 args = vars(ap.parse_args())
 
-'''
 #inicializacion de variables - fechas
 Date_Ini = (args["date_ini"]) #'2020-01-01' #replace for dynamic dates
 Date_Fin = (args["date_fin"]) #'2020-01-31' #replace for dynamic dates
-
+#Date_Ini='2020-01-01'
+#Date_Fin='2020-01-31'
+#user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E'
 #inicializacion de variables - user / area
-user_analysis = (args["user"]) #'7x27nHWFRKZhXePiHbVfkHBx9MC3/-M9nlimuyRUhXIlsAicA' # 
-#user_analysis = 'XnpUeu6f9oaV7YMXG2NKTSa75EE3/-MAYVhF63-q6yNaIvqhs'
-analysis_area = user_analysis.split("/")[1]
-'''
+user_analysis = (args["user"])
+if user_analysis != 'no' : 
+    analysis_area = user_analysis.split("/")[1]
+
 x_width = 768*2    #16km width
 y_height = 768*2   #16km height
 
 #funcion para leer firebase
-lote_aoi,lote_aoi_loc,minx,maxx,miny,maxy,bounding_box, user_analysis, analysis_area, Date_Ini, Date_Fin = Fire_down.find_poly()
-Date_Ini = '2020-01-01' #replace for dynamic dates
-Date_Fin = '2020-01-31' #replace for dynamic dates
+
+lote_aoi,lote_aoi_loc,minx,maxx,miny,maxy,bounding_box, user_analysis, analysis_area, Date_Ini, Date_Fin = Fire_down.find_poly(user_analysis,Date_Ini, Date_Fin)       
+
 print("[INFO] box coordinates (min_x, max_x = {:.2f}, {:.2f})".format(minx,maxx))
 print("[INFO] box coordinates (min_y, max_y = {:.2f}, {:.2f})".format(miny,maxy))
+print("[INFO] tiempo de analisis (fecha_inicial, fecha_final = {}, {})".format(Date_Ini, Date_Fin))
+print("[INFO] usuario y terreno de analisis (usuario, terreno= {} / {})".format(user_analysis, analysis_area))
 
+      
 #leer shapefile
 aoi = gpd.read_file('shapefiles/'+analysis_area+'/big_box.shp') #para imagen satelital
 aoi.crs = {'init':'epsg:32618', 'no_defs': True}
@@ -70,6 +76,8 @@ for i in aoi_universal['geometry']:                             #area
 Path('output_clouds/'+analysis_area).mkdir(parents=True, exist_ok=True)   
 #cloud detection            
 best_date, valid_dates, clouds_data = Cloud_finder.cloud_process(bounding_box, Date_Ini, Date_Fin, x_width, y_height,analysis_area)
+#valid_dates=['20200104','20200109','20200114','20200129']
+#best_date='20200104'
 print(best_date)
 
 #download images
@@ -77,7 +85,7 @@ Path('Zipped_Images/').mkdir(parents=True, exist_ok=True)
 Path('Unzipped_Images/'+analysis_area).mkdir(parents=True, exist_ok=True)
 
 down_yes = (args["download"])
-#down_yes = 'yes'
+#down_yes = 'no'
 if down_yes == 'yes':
     Sentinel_downloader.image_down(footprint, Date_Ini, Date_Fin, valid_dates, analysis_area)
 direcciones = Sentinel_downloader.get_routes(analysis_area)
@@ -108,11 +116,21 @@ for dire in direcciones:
     x_width_band, y_height_band = Satellite_tools.cld_msk(date, clouds_data, ind_mask, analysis_area)
     
     #calculate NDVI
-    meta = Satellite_tools.ndvi_calc(date, analysis_area) #calculate NDVI
-    Satellite_tools.plot_ndvi(date, analysis_area, "_NDVI.tif", "_NDVI_export.png","Output_Images/") #export png file
+    meta = Satellite_tools.ndvi_calc(date, analysis_area,'grass') #calculate NDVI, crop='grass'
+    Satellite_tools.plot_ndvi(date, analysis_area, "_NDVI.tif", "_NDVI_export.png","Output_Images/",'RdYlGn', -1, 1) #export png file
     Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_NDVI.tif", "_NDVI_lote.tif","Output_Images/" ) #crop tif to small area analysis
-    Satellite_tools.plot_ndvi(date, analysis_area, "_NDVI_lote.tif", "_NDVI_analysis_lotes.png","Output_Images/" ) #export png of small area analysis
-    
+    Satellite_tools.plot_ndvi(date, analysis_area, "_NDVI_lote.tif", "_NDVI_analysis_lotes.png","Output_Images/",'RdYlGn', -1, 1) #export png of small area analysis
+    #calculate moisture
+    Satellite_tools.band_calc(date, analysis_area,'B8A','B11','_MOIST',x_width)
+    Satellite_tools.plot_ndvi(date, analysis_area, "_MOIST.tif", "_MOIST_export.png","Output_Images/",'RdYlBu', -1, 1) #export png file
+    Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_MOIST.tif", "_MOIST_lote.tif","Output_Images/" ) #crop tif to small area analysis
+    Satellite_tools.plot_ndvi(date, analysis_area, "_MOIST_lote.tif", "_MOIST_analysis_lotes.png","Output_Images/",'RdYlBu', -1, 1) #export png of small area analysis
+    #plot Leaf Area Index and Bio-Mass (calculated in ndvi_calc)
+    Satellite_tools.plot_ndvi(date, analysis_area, "_LAI.tif", "_LAI_export.png","Output_Images/",'nipy_spectral_r', 0, 3) #max imposible 6.3
+    Satellite_tools.band_calc(date, analysis_area,'B03','B08','NDWI',x_width)
+    Satellite_tools.plot_ndvi(date, analysis_area, "NDWI.tif", "_NDWI_export.png","Output_Images/",'RdYlBu', -1, 0.4) #export png file
+    Satellite_tools.plot_ndvi(date, analysis_area, "_BM.tif", "_BM_export.png","Output_Images/",'nipy_spectral_r', 2000, 3500) #max imposible 4500
+       
 #contornos
 edged2, canvas = Contour_detect.read_image_tif(best_date,analysis_area) #leer imagen y generar fondo negro
 lotesa_res = Contour_detect.identif_forms(edged2,50,10,200,1) #deteccion de contornos basado en NDVI 50/255 separador
