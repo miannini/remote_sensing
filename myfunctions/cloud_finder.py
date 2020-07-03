@@ -8,7 +8,7 @@ from myfunctions.tools import Cloudless_tools
 #cloud detection
 class Cloud_finder:
     def cloud_process(bounding_box, Date_Ini, Date_Fin, x_width, y_height,analysis_area):
-        INSTANCE_ID = 'd855383e-2ab0-4f3e-826d-a571630d5dc8' #From Sentinel HUB Python Instance ID /change to dynamic user input
+        INSTANCE_ID = '89535ee2-317e-4ca3-973c-a6f3b8e6b5be' #From Sentinel HUB Python Instance ID /change to dynamic user input
         LAYER_NAME = 'TRUE-COLOR-S2-L1C' # e.g. TRUE-COLOR-S2-L1C
         #Obtener imagenes por fecha (dentro de rango) dentro de box de interés
         wms_true_color_request = WmsRequest(layer=LAYER_NAME,

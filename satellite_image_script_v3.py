@@ -41,13 +41,14 @@ ap.add_argument("-f", "--date_fin", type=str, default='no',
 args = vars(ap.parse_args())
 
 #inicializacion de variables - fechas
-Date_Ini = (args["date_ini"]) #'2020-01-01' #replace for dynamic dates
-Date_Fin = (args["date_fin"]) #'2020-01-31' #replace for dynamic dates
+Date_Ini = (args["date_ini"]) 
+Date_Fin = (args["date_fin"]) 
 #Date_Ini='2020-01-01'
 #Date_Fin='2020-01-31'
-#user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E'
+
 #inicializacion de variables - user / area
 user_analysis = (args["user"])
+#user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E'
 if user_analysis != 'no' : 
     analysis_area = user_analysis.split("/")[1]
 
@@ -55,7 +56,6 @@ x_width = 768*2    #16km width
 y_height = 768*2   #16km height
 
 #funcion para leer firebase
-
 lote_aoi,lote_aoi_loc,minx,maxx,miny,maxy,bounding_box, user_analysis, analysis_area, Date_Ini, Date_Fin = Fire_down.find_poly(user_analysis,Date_Ini, Date_Fin)       
 
 print("[INFO] box coordinates (min_x, max_x = {:.2f}, {:.2f})".format(minx,maxx))
