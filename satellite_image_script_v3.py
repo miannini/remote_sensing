@@ -76,8 +76,6 @@ for i in aoi_universal['geometry']:                             #area
 Path('output_clouds/'+analysis_area).mkdir(parents=True, exist_ok=True)   
 #cloud detection            
 best_date, valid_dates, clouds_data = Cloud_finder.cloud_process(bounding_box, Date_Ini, Date_Fin, x_width, y_height,analysis_area)
-#valid_dates=['20200104','20200109','20200114','20200129']
-#best_date='20200104'
 print(best_date)
 
 #download images
@@ -132,9 +130,9 @@ for dire in direcciones:
     Satellite_tools.plot_ndvi(date, analysis_area, "_BM.tif", "_BM_export.png","Output_Images/",'nipy_spectral_r', 2000, 3500) #max imposible 4500
        
 #contornos
-edged2, canvas = Contour_detect.read_image_tif(best_date,analysis_area) #leer imagen y generar fondo negro
-lotesa_res = Contour_detect.identif_forms(edged2,50,10,200,1) #deteccion de contornos basado en NDVI 50/255 separador
-lotesb_res = Contour_detect.identif_forms(edged2,205,10,200,3) #deteccion de contornos basado en NDVI 205/255 separador
+edged2, canvas = Contour_detect.read_image_tif(best_date,analysis_area,"_NDVI.tif") #leer imagen y generar fondo negro
+lotesa_res = Contour_detect.identif_forms(edged2,50,10,200,1) #50 deteccion de contornos basado en NDVI 50/255 separador
+lotesb_res = Contour_detect.identif_forms(edged2,205,10,200,3) #205 deteccion de contornos basado en NDVI 205/255 separador
 #transformar coordenadas
 lotes_a = Contour_detect.trns_lst(lotesa_res,meta) #transformacion de coordenadas x,y pixel a EPSG32618
 lotes_b = Contour_detect.trns_lst(lotesb_res,meta) #transformacion de coordenadas x,y pixel a EPSG32618
@@ -180,7 +178,7 @@ for data_i in list_dates : #cambiar por list_dates
     analysis_date='Output_Images/'+analysis_area+'/'+ data_i
     folder_out = 'Images_to_firebase/'+analysis_area+'/'+ data_i
     Satellite_tools.area_crop(data_i,aoig_near,analysis_area,"_NDVI.tif", "_NDVI_lotes.tif",'Output_Images/') #agregar folder origen y destion, lo mismo para la funcion
-    Satellite_tools.plot_ndvi(data_i, analysis_area, "_NDVI_lotes.tif", "NDVI_Lote_&_Neighbors"+str(cnt)+".png", "Images_to_firebase/" ) #export png of small area analysis -- proposed name was _NDVI_benchmarking_lotes.png
+    Satellite_tools.plot_ndvi(data_i, analysis_area, "_NDVI_lotes.tif", "NDVI_Lote_&_Neighbors"+str(cnt)+".png", "Images_to_firebase/",'RdYlGn', -1, 1 ) #export png of small area analysis -- proposed name was _NDVI_benchmarking_lotes.png
     size_flag, datag = Stats_charts.data_g(data_i,analysis_date, aoig_near)
     if size_flag:
         print(data_i)
