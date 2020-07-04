@@ -178,7 +178,7 @@ for data_i in list_dates : #cambiar por list_dates
     analysis_date='Output_Images/'+analysis_area+'/'+ data_i
     folder_out = 'Images_to_firebase/'+analysis_area+'/'+ data_i
     Satellite_tools.area_crop(data_i,aoig_near,analysis_area,"_NDVI.tif", "_NDVI_lotes.tif",'Output_Images/') #agregar folder origen y destion, lo mismo para la funcion
-    Satellite_tools.plot_ndvi(data_i, analysis_area, "_NDVI_lotes.tif", "NDVI_Lote_&_Neighbors"+str(cnt)+".png", "Images_to_firebase/",'RdYlGn', -1, 1 ) #export png of small area analysis -- proposed name was _NDVI_benchmarking_lotes.png
+    Satellite_tools.plot_ndvi(data_i, analysis_area, "_NDVI_lotes.tif", "NDVI_Lote_&_Neighbors"+str(cnt)+".png", "Images_to_firebase/",'RdYlGn', -1, 1 ) # added cmap and limits
     size_flag, datag = Stats_charts.data_g(data_i,analysis_date, aoig_near)
     if size_flag:
         print(data_i)
@@ -224,7 +224,7 @@ plt.setp(median_plot.get_xticklabels(), rotation=80)
 plt.savefig(folder_out[:-8]+'NDVI_Lotes_MedianOVT.png',bbox_inches='tight',dpi=200) # esto al firebas
 plt.clf()
     
-    #mover imagenes NDVI lote0 de las fechas a carpeta firebase
+#mover imagenes NDVI lote0 de las fechas a carpeta firebase
 #crear de una vez base de datos de pixeles
 
 
