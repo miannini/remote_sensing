@@ -13,7 +13,7 @@ import time
 firebase = firebase.FirebaseApplication('https://proyectopiloto-28591.firebaseio.com/', None)
 
 class Fire_down:
-	def find_poly(user_analysis,Date_Ini, Date_Fin):
+	def find_poly(user_analysis,Date_Ini, Date_Fin, shape_folder):
          if user_analysis == 'no':
              alldb = firebase.get('coordinatesUser/', None)
              pending = []
@@ -53,7 +53,7 @@ class Fire_down:
          
          #Creación del shape respecto a coordenas de vértices
          analysis_area = user_analysis.split("/")[1]
-         w = shapefile.Writer('shapefiles/'+analysis_area+'/big_box')
+         w = shapefile.Writer(shape_folder+analysis_area+'/big_box')
          w.field('name', 'C')
          w.poly([
                      [[minx,miny], [minx,maxy], [maxx,maxy], [maxx,miny], [minx,miny]]

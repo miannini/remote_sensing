@@ -9,9 +9,9 @@ from myfunctions.tools import Satellite_tools
 
 class Contour_detect:
     #function to identify forms in image based on contours
-    def read_image_tif(best_date, analysis_area,im_name): #im_name = "_NDVI.tif" or "_LAI.tif"
+    def read_image_tif(best_date, analysis_area,im_name,output_folder): #im_name = "_NDVI.tif" or "_LAI.tif"
         best_date = str(best_date.date()).replace('-','')
-        imagen = cv2.imread("Output_Images/"+analysis_area+'/'+best_date+im_name,-1)
+        imagen = cv2.imread(output_folder+analysis_area+'/'+best_date+im_name,-1)
         dimens = imagen.shape
         slice1Copy = (imagen*255).astype(np.uint8)
         canvas = np.zeros(slice1Copy.shape, np.uint8)

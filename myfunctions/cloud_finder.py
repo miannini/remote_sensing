@@ -7,7 +7,7 @@ from s2cloudless import S2PixelCloudDetector, CloudMaskRequest
 from myfunctions.tools import Cloudless_tools
 #cloud detection
 class Cloud_finder:
-    def cloud_process(bounding_box, Date_Ini, Date_Fin, x_width, y_height,analysis_area):
+    def cloud_process(bounding_box, Date_Ini, Date_Fin, x_width, y_height,analysis_area,clouds_folder):
         INSTANCE_ID = '89535ee2-317e-4ca3-973c-a6f3b8e6b5be' #From Sentinel HUB Python Instance ID /change to dynamic user input
         LAYER_NAME = 'TRUE-COLOR-S2-L1C' # e.g. TRUE-COLOR-S2-L1C
         #Obtener imagenes por fecha (dentro de rango) dentro de box de interés
@@ -48,7 +48,7 @@ class Cloud_finder:
             image = wms_true_color_imgs[idx]
             Cloudless_tools.overlay_cloud_mask(image, mask, factor=1, fig=fig)
         plt.tight_layout()
-        plt.savefig('output_clouds/'+analysis_area+'/real_and_cloud.png')
+        plt.savefig(clouds_folder+analysis_area+'/real_and_cloud.png')
         #Mostrar las mascaras de nubes para cada imagen por fecha en el rango de analisis
         fig = plt.figure(figsize=(15, 10))
         n_cols = 4
@@ -57,7 +57,7 @@ class Cloud_finder:
             ax = fig.add_subplot(n_rows, n_cols, idx + 1)
             Cloudless_tools.plot_cloud_mask(cloud_mask, fig=fig)  
         plt.tight_layout()
-        plt.savefig('output_clouds/'+analysis_area+'/cloud_masks.png')
+        plt.savefig(clouds_folder+analysis_area+'/cloud_masks.png')
         #Calculo y extracción de imagenes con cobertura de nubes menor a x%
         cld_per_idx = []
         each_cld_mask = all_cloud_masks.get_cloud_masks(threshold=0.35)                 #se repite con linea 94
@@ -83,6 +83,6 @@ class Cloud_finder:
             ax = fig.add_subplot(n_rows, n_cols, idx + 1)
             Cloudless_tools.plot_cloud_mask(cloud_mask, fig=fig)
         plt.tight_layout()
-        plt.savefig('output_clouds/'+analysis_area+'/cloud_masks_valid.png')
+        plt.savefig(clouds_folder+analysis_area+'/cloud_masks_valid.png')
 
         return best_date, valid_dates, clouds_data

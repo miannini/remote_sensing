@@ -7,7 +7,7 @@ password = 'An4lytics@89'
 api = SentinelAPI(user, password, 'https://scihub.copernicus.eu/dhus')
 
 class Sentinel_downloader:
-    def image_down(footprint, Date_Ini, Date_Fin, valid_dates, analysis_area):
+    def image_down(footprint, Date_Ini, Date_Fin, valid_dates, analysis_area,zipped_folder,unzipped_folder):
         Date_Ini_c = Date_Ini.replace('-','')
         Date_Fin_c = Date_Fin.replace('-','')
         products = api.query(footprint,
@@ -33,20 +33,20 @@ class Sentinel_downloader:
                     print(file,title)
         #Descarga de Imagenes por bandas
         for n in file_list:
-            api.download(n, "Zipped_Images/")
+            api.download(n, zipped_folder)
         
         #Descomprimir Metadata y eliminación de archivos descargados
-        for root, dirs, files in os.walk("Zipped_Images"):
+        for root, dirs, files in os.walk(zipped_folder):
             for file in files:
                 if file.endswith(".zip"):
                         zipfile_path = os.path.join(root, file)
                         with zipfile.ZipFile(zipfile_path, 'r') as zip_ref:
-                            zip_ref.extractall("Unzipped_Images/"+analysis_area)
+                            zip_ref.extractall(unzipped_folder+analysis_area)
                         os.remove(zipfile_path)
     #obtener rutas de las imagenes .jp2                    
-    def get_routes(analysis_area):
+    def get_routes(analysis_area,unzipped_folder):
         direcciones=[]
-        for root, dirs, files in os.walk("Unzipped_Images/"+analysis_area):
+        for root, dirs, files in os.walk(unzipped_folder+analysis_area):
             for file in files:
                 if file.endswith(".jp2"):
                     x=os.path.join(root, file)

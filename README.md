@@ -1,8 +1,8 @@
 ## Satellite_analysis
 
-satellite_image_script se usara para analisis puntuales y pruebas. aqui se puede definir usuario/terreno, fechas de analisis y si se descarga o no imagenes.
+#satellite_image_script se usara para analisis puntuales y pruebas. aqui se puede definir usuario/terreno, fechas de analisis y si se descarga o no imagenes.
 	- este va a ser eliminado proximamente, ya que el "_v3" puede hacer lo mismo, al definir usuario o fechas como input
-satellite_image_script_v3:
+#satellite_image_script_v3:
 	- para ejecutar en CMD = python satellite_image_script_v3.py --download yes (automatizado para descargar mas reciente solicitud de firebase con fechas de usuario)
 	- hay varios user inputs que se pueden agregar despues del script, para hacer cosas diferentes:
 		* --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E, analiza el usuario/terreno definido (se puede cambiar el usuario/terreno a uno propio)

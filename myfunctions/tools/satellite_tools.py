@@ -12,7 +12,7 @@ import cv2
 #more complex than rest
 
 class Satellite_tools:
-    def crop_sat(folder, name, aoi, analysis_area):
+    def crop_sat(folder, name, aoi, analysis_area,output_folder):
         with rio.open(folder+name) as src:
             out_image, out_transform = rio.mask.mask(src, aoi.geometry,crop=True)
             out_meta = src.meta.copy()
@@ -22,43 +22,43 @@ class Satellite_tools:
                          "transform": out_transform})
             src.close()
         date,band = name.split("_")[1],name.split("_")[2] #agregué tercer argumento
-        newname = "Output_Images/"+analysis_area+'/'+date[:8]+""+band[:3]+".tif"
+        newname = output_folder+analysis_area+'/'+date[:8]+""+band[:3]+".tif"
         with rio.open(newname, "w", **out_meta) as dest:
             dest.write(out_image)
             dest.close()
     
-    def area_crop(date,aoi2,analysis_area,source, destination, dest_folder): #"_NDVI.tif", "_NDVI_lote.tif","Output_Images/" 
-        with rio.open("Output_Images/"+analysis_area+'/'+date[:8]+source) as src:
+    def area_crop(date,aoi2,analysis_area,source, destination, output_folder): #"_NDVI.tif", "_NDVI_lote.tif","Output_Images/" 
+        with rio.open(output_folder+analysis_area+'/'+date[:8]+source) as src:
             out_image, out_transform = rio.mask.mask(src, aoi2.geometry,crop=True)
             out_meta = src.meta.copy()
             out_meta.update({"driver": "GTiff",
                          "height": out_image.shape[1],
                          "width": out_image.shape[2],
                          "transform": out_transform})    
-        with rio.open(dest_folder+analysis_area+'/'+date[:8]+destination, "w", **out_meta) as dest:
+        with rio.open(output_folder+analysis_area+'/'+date[:8]+destination, "w", **out_meta) as dest:
             dest.write(out_image)
             
-    def cld_msk(date, clouds_data, ind_mask, analysis_area):
-        b4a = rio.open("Output_Images/"+analysis_area+'/'+date[:8]+"B04.tif") #Automatizar nombre a 4 elemento del directorio
+    def cld_msk(date, clouds_data, ind_mask, analysis_area,output_folder):
+        b4a = rio.open(output_folder+analysis_area+'/'+date[:8]+"B04.tif") #Automatizar nombre a 4 elemento del directorio
         x_width = b4a.width
         y_height = b4a.height
         b4a.close()
         #x_width,y_height
         #cloud mask generate file
-        src = "Output_Images/"+analysis_area+'/'+date[:8]+"B04.tif"
+        src = output_folder+analysis_area+'/'+date[:8]+"B04.tif"
         arr = gdal_array.LoadFile(src) 
-        output = gdal_array.SaveArray(clouds_data[ind_mask], "Output_Images/"+analysis_area+'/'+date[:8]+"_cldmsk.tif", format="GTiff", prototype=src)
+        output = gdal_array.SaveArray(clouds_data[ind_mask], output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif", format="GTiff", prototype=src)
         #cloud mask generate file 2nd pass
-        src = "Output_Images/"+analysis_area+'/'+date[:8]+"B04.tif"
+        src = output_folder+analysis_area+'/'+date[:8]+"B04.tif"
         arr = gdal_array.LoadFile(src) 
-        output = gdal_array.SaveArray(clouds_data[ind_mask], "Output_Images/"+analysis_area+'/'+date[:8]+"_cldmsk.tif", format="GTiff", prototype=src)
+        output = gdal_array.SaveArray(clouds_data[ind_mask], output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif", format="GTiff", prototype=src)
         return x_width, y_height
     
-    def ndvi_calc(date, analysis_area,crop):
+    def ndvi_calc(date, analysis_area,crop,output_folder):
         # Open b4(red),b8
-        msk_cloud = rio.open("Output_Images/"+analysis_area+'/'+date[:8]+"_cldmsk.tif")       
-        b4a = rio.open("Output_Images/"+analysis_area+'/'+date[:8]+"B04.tif")
-        b8a = rio.open("Output_Images/"+analysis_area+'/'+date[:8]+"B08.tif")
+        msk_cloud = rio.open(output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif")       
+        b4a = rio.open(output_folder+analysis_area+'/'+date[:8]+"B04.tif")
+        b8a = rio.open(output_folder+analysis_area+'/'+date[:8]+"B08.tif")
         # read Red(b4) and NIR(b8) as arrays
         red = b4a.read()
         nir = b8a.read()
@@ -81,27 +81,27 @@ class Satellite_tools:
         meta = b4a.meta
         meta.update(driver='GTiff')
         meta.update(dtype=rio.float32)
-        with rio.open("Output_Images/"+analysis_area+'/'+date[:8]+"_NDVI.tif", 'w', **meta) as dst:
+        with rio.open(output_folder+analysis_area+'/'+date[:8]+"_NDVI.tif", 'w', **meta) as dst:
             dst.write(ndvi.astype(rio.float32))
             dst.close()
             b4a.close()
             b8a.close()
-        with rio.open("Output_Images/"+analysis_area+'/'+date[:8]+"_LAI.tif", 'w', **meta) as dst:
+        with rio.open(output_folder+analysis_area+'/'+date[:8]+"_LAI.tif", 'w', **meta) as dst:
             dst.write(lai.astype(rio.float32))
             dst.close()
             b4a.close()
             b8a.close()
-        with rio.open("Output_Images/"+analysis_area+'/'+date[:8]+"_BM.tif", 'w', **meta) as dst:
+        with rio.open(output_folder+analysis_area+'/'+date[:8]+"_BM.tif", 'w', **meta) as dst:
             dst.write(bm.astype(rio.float32))
             dst.close()
             b4a.close()
             b8a.close()
         return meta
     
-    def band_calc(date, analysis_area, band1, band2, name,x_width): #'B04', 'B08', 'NDWI'
-        msk_cloud = rio.open("Output_Images/"+analysis_area+'/'+date[:8]+"_cldmsk.tif")       
-        b1 = rio.open("Output_Images/"+analysis_area+'/'+date[:8]+band1+".tif")
-        b2 = rio.open("Output_Images/"+analysis_area+'/'+date[:8]+band2+".tif")
+    def band_calc(date, analysis_area, band1, band2, name,x_width,output_folder): #'B04', 'B08', 'NDWI'
+        msk_cloud = rio.open(output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif")       
+        b1 = rio.open(output_folder+analysis_area+'/'+date[:8]+band1+".tif")
+        b2 = rio.open(output_folder+analysis_area+'/'+date[:8]+band2+".tif")
         # read Red(b4) and NIR(b8) as arrays
         b1r = b1.read()
         b2r = b2.read()
@@ -112,7 +112,7 @@ class Satellite_tools:
         calculated = (b1r.astype(float)-b2r.astype(float))/(b1r+b2r)
         #for bands with 20m resolution, reshape cloud mask to scale size       
         if x_width > b1.width:
-            img = cv2.imread("Output_Images/"+analysis_area+'/'+date[:8]+"_cldmsk.tif",-1)
+            img = cv2.imread(output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif",-1)
             scale_percent = b1.width/x_width # percent of original size
             width = int(img.shape[1] * scale_percent)
             height = int(img.shape[0] * scale_percent)
@@ -130,14 +130,14 @@ class Satellite_tools:
         meta = b1.meta
         meta.update(driver='GTiff')
         meta.update(dtype=rio.float32)
-        with rio.open("Output_Images/"+analysis_area+'/'+date[:8]+name+".tif", 'w', **meta) as dst:
+        with rio.open(output_folder+analysis_area+'/'+date[:8]+name+".tif", 'w', **meta) as dst:
             dst.write(calculated.astype(rio.float32))
             dst.close()
             b1.close()
             b2.close()
     
-    def plot_ndvi(date, analysis_area, source, destination,dest_folder,cmap,min_loc,max_loc): #source="_NDVI.tif", destination="_NDVI_export.png", dest_folder="Output_Images/", cmap='RdYlGn'
-        ndvi_plt = rio.open("Output_Images/"+analysis_area+'/'+date[:8]+source) #"_NDVI.tif"
+    def plot_ndvi(date, analysis_area, source, destination,output_folder,cmap,min_loc,max_loc): #source="_NDVI.tif", destination="_NDVI_export.png", dest_folder="Output_Images/", cmap='RdYlGn'
+        ndvi_plt = rio.open(output_folder+analysis_area+'/'+date[:8]+source) #"_NDVI.tif"
         ndvi = ndvi_plt.read(1)
         ndvi[ndvi==0] = None
         fig = plt.figure(figsize=(16,16))
@@ -152,7 +152,7 @@ class Satellite_tools:
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(im, cax=cax)
-        plt.savefig(dest_folder+analysis_area+'/'+date[:8]+destination,bbox_inches='tight',dpi=500)
+        plt.savefig(output_folder+analysis_area+'/'+date[:8]+destination,bbox_inches='tight',dpi=500)
         plt.clf()
         
     def trns_coor(area,meta):
