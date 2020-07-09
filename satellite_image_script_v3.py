@@ -1,6 +1,6 @@
 # USAGE
 #todo declarado
-# python satellite_image_script_v3.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E --download yes --date_ini 2020-01-01 --date_fin 2020-01-31 --erase yes
+# python satellite_image_script_v3.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E --download yes --date_ini 2020-01-01 --date_fin 2020-01-31 --shape external_shape --own no --erase yes
 #sin declarar nada
 # python satellite_image_script_v3.py
 # declarando solo fecha
@@ -27,6 +27,7 @@ from myfunctions.tools import Satellite_tools
 from myfunctions import Contour_detect
 from myfunctions.temp_stats import Stats_charts
 from myfunctions import Upload_fire
+from myfunctions import Ext_shape
 import argparse
 
 ## variables dinamicas para correr en terminal unicamente
@@ -39,6 +40,10 @@ ap.add_argument("-i", "--date_ini", type=str, default='no',
 	help="define initial date yyyy-mm-dd")
 ap.add_argument("-f", "--date_fin", type=str, default='no',
 	help="define final date yyyy-mm-dd")
+ap.add_argument("-s", "--shape", type=str, default='no',
+	help="optional external shapes folder")
+ap.add_argument("-o", "--own", type=str, default='yes',
+	help="keep own terrain (only in conjunction with external shapes)")
 ap.add_argument("-e", "--erase", type=str, default='no',
 	help="define if erase unzipped images yes/no")
 args = vars(ap.parse_args())
@@ -66,7 +71,7 @@ print("[INFO] box coordinates (min_y, max_y = {:.2f}, {:.2f})".format(miny,maxy)
 print("[INFO] tiempo de analisis (fecha_inicial, fecha_final = {}, {})".format(Date_Ini, Date_Fin))
 print("[INFO] usuario y terreno de analisis (usuario, terreno= {} / {})".format(user_analysis, analysis_area))
 
-      
+    
 #leer shapefile
 aoi = gpd.read_file(shape_folder+analysis_area+'/big_box.shp') #para imagen satelital
 aoi.crs = {'init':'epsg:32618', 'no_defs': True}
@@ -75,6 +80,20 @@ footprint = None
 for i in aoi_universal['geometry']:                             #area
     footprint = i
 
+#leer shapefiles externos si es requerido
+folder_name = (args["shape"])
+keep_own = (args["own"]) 
+if folder_name != "no":
+    todos_lotes = Ext_shape.merge_shapes(shape_folder,lote_aoi_loc,folder_name)
+    #si se definio external shapefiles, aoig_near contendra la misma info
+    if keep_own != 'yes':
+        todos_lotes=todos_lotes.iloc[1:,:] #remove row 0 is firebase terrain
+        print("[info] lote de firebase, removido del analisis")
+    aoig_near = todos_lotes
+    lote_aoi_loc = todos_lotes
+    print("[info] lotes totales incluyendo de archivo externo = {}".format(len(todos_lotes)))
+
+    
 #folder de imagenes nubes
 clouds_folder = '../Data/output_clouds/'
 Path(clouds_folder+analysis_area).mkdir(parents=True, exist_ok=True)   
@@ -123,53 +142,57 @@ for dire in direcciones:
     #calculate NDVI
     meta = Satellite_tools.ndvi_calc(date, analysis_area,'grass',output_folder) #calculate NDVI, crop='grass'
     Satellite_tools.plot_ndvi(date, analysis_area, "_NDVI.tif", "_NDVI_export.png",output_folder,'RdYlGn', -1, 1) #export png file
-    Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_NDVI.tif", "_NDVI_lote.tif",output_folder ) #crop tif to small area analysis
+    Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_NDVI.tif", "_NDVI_lote.tif",output_folder ) #crop tif to small area analysis // lote_aoi_loc
     Satellite_tools.plot_ndvi(date, analysis_area, "_NDVI_lote.tif", "_NDVI_analysis_lotes.png",output_folder,'RdYlGn', -1, 1) #export png of small area analysis
     #calculate moisture
     Satellite_tools.band_calc(date, analysis_area,'B8A','B11','_MOIST',x_width,output_folder)
     Satellite_tools.plot_ndvi(date, analysis_area, "_MOIST.tif", "_MOIST_export.png",output_folder,'RdYlBu', -1, 1) #export png file
-    Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_MOIST.tif", "_MOIST_lote.tif",output_folder ) #crop tif to small area analysis
+    Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_MOIST.tif", "_MOIST_lote.tif",output_folder ) #crop tif to small area analysis  //lote_aoi_loc
     Satellite_tools.plot_ndvi(date, analysis_area, "_MOIST_lote.tif", "_MOIST_analysis_lotes.png",output_folder,'RdYlBu', -1, 1) #export png of small area analysis
     #plot Leaf Area Index and Bio-Mass (calculated in ndvi_calc)
     Satellite_tools.plot_ndvi(date, analysis_area, "_LAI.tif", "_LAI_export.png",output_folder,'nipy_spectral_r', 0, 3) #max imposible 6.3
     Satellite_tools.band_calc(date, analysis_area,'B03','B08','_NDWI',x_width,output_folder)
     Satellite_tools.plot_ndvi(date, analysis_area, "_NDWI.tif", "_NDWI_export.png",output_folder,'RdYlBu', -1, 0.4) #export png file
     Satellite_tools.plot_ndvi(date, analysis_area, "_BM.tif", "_BM_export.png",output_folder,'nipy_spectral_r', 2000, 3500) #max imposible 4500
-       
-#contornos
-edged2, canvas = Contour_detect.read_image_tif(best_date,analysis_area,"_NDVI.tif",output_folder) #leer imagen y generar fondo negro
-lotesa_res = Contour_detect.identif_forms(edged2,50,10,200,1) #50 deteccion de contornos basado en NDVI 50/255 separador
-lotesb_res = Contour_detect.identif_forms(edged2,205,10,200,3) #205 deteccion de contornos basado en NDVI 205/255 separador
-#transformar coordenadas
-lotes_a = Contour_detect.trns_lst(lotesa_res,meta) #transformacion de coordenadas x,y pixel a EPSG32618
-lotes_b = Contour_detect.trns_lst(lotesb_res,meta) #transformacion de coordenadas x,y pixel a EPSG32618
-#graficar contornos
-fig = plt.figure(figsize=(10,10))
-plt.imshow(cv2.drawContours(canvas, lotesa_res, -1, (255, 255, 255), 1))
-plt.imshow(cv2.drawContours(canvas, lotesb_res, -1, (255, 255, 255), 1))
-plt.savefig(shape_folder+analysis_area+'/detected_contours.png',bbox_inches='tight',dpi=200)
 
-#crear geodataframe
-aoig_a = Contour_detect.create_geodata(lotes_a)
-aoig_b = Contour_detect.create_geodata(lotes_b)
-crs = {'init': 'epsg:32618'}
-aoig_c =gpd.GeoDataFrame( pd.concat( [aoig_a,aoig_b], ignore_index=False) , crs=crs)
-aoig_c_plot = aoig_c.to_crs("epsg:4326")
-#export shapefile
-aoig_c.to_file(shape_folder+analysis_area+'/lotes_auto_.shp')
+#pasar esto a una funcion.
+#si se definir external shapes, no hacer esto. 
+if folder_name == "no":
+    #contornos
+    edged2, canvas = Contour_detect.read_image_tif(best_date,analysis_area,"_NDVI.tif",output_folder) #leer imagen y generar fondo negro
+    lotesa_res = Contour_detect.identif_forms(edged2,50,10,200,1) #50 deteccion de contornos basado en NDVI 50/255 separador
+    lotesb_res = Contour_detect.identif_forms(edged2,205,10,200,3) #205 deteccion de contornos basado en NDVI 205/255 separador
+    #transformar coordenadas
+    lotes_a = Contour_detect.trns_lst(lotesa_res,meta) #transformacion de coordenadas x,y pixel a EPSG32618
+    lotes_b = Contour_detect.trns_lst(lotesb_res,meta) #transformacion de coordenadas x,y pixel a EPSG32618
+    #graficar contornos
+    fig = plt.figure(figsize=(10,10))
+    plt.imshow(cv2.drawContours(canvas, lotesa_res, -1, (255, 255, 255), 1))
+    plt.imshow(cv2.drawContours(canvas, lotesb_res, -1, (255, 255, 255), 1))
+    plt.savefig(shape_folder+analysis_area+'/detected_contours.png',bbox_inches='tight',dpi=200)
+    
+    #crear geodataframe
+    aoig_a = Contour_detect.create_geodata(lotes_a)
+    aoig_b = Contour_detect.create_geodata(lotes_b)
+    crs = {'init': 'epsg:32618'}
+    aoig_c =gpd.GeoDataFrame( pd.concat( [aoig_a,aoig_b], ignore_index=False) , crs=crs)
+    aoig_c_plot = aoig_c.to_crs("epsg:4326")
+    #export shapefile
+    aoig_c.to_file(shape_folder+analysis_area+'/lotes_auto_.shp')
+    
+    #lotes cercanos
+    aoig = gpd.GeoDataFrame(pd.concat([lote_aoi_loc,aoig_c], ignore_index=True), crs=lote_aoi_loc.crs)
+    aoig["x"] = aoig.centroid.map(lambda p: p.x) 
+    aoig["y"] = aoig.centroid.map(lambda p: p.y)
+    aoig['distance']=99999
+    #calculate distance between centroids
+    for n in range(1,len(aoig)):
+        aoig.iloc[n,3] = np.sqrt((aoig.iloc[n,1]-aoig.iloc[0,1])**2+(aoig.iloc[n,2]-aoig.iloc[0,2])**2)
+    #get 10 nearest polygons, with minimum distance of 500m
+    aoig = aoig[aoig['distance']>=500]
+    aoig_near = aoig.nsmallest(10, ['distance']) 
+    aoig_near = gpd.GeoDataFrame( pd.concat( [lote_aoi_loc,aoig_near], ignore_index=True) , crs=lote_aoi_loc.crs)
 
-#lotes cercanos
-aoig = gpd.GeoDataFrame(pd.concat([lote_aoi_loc,aoig_c], ignore_index=True), crs=lote_aoi_loc.crs)
-aoig["x"] = aoig.centroid.map(lambda p: p.x) 
-aoig["y"] = aoig.centroid.map(lambda p: p.y)
-aoig['distance']=99999
-#calculate distance between centroids
-for n in range(1,len(aoig)):
-    aoig.iloc[n,3] = np.sqrt((aoig.iloc[n,1]-aoig.iloc[0,1])**2+(aoig.iloc[n,2]-aoig.iloc[0,2])**2)
-#get 10 nearest polygons, with minimum distance of 500m
-aoig = aoig[aoig['distance']>=500]
-aoig_near = aoig.nsmallest(10, ['distance']) 
-aoig_near = gpd.GeoDataFrame( pd.concat( [lote_aoi_loc,aoig_near], ignore_index=True) , crs=lote_aoi_loc.crs)
 
 #estadisticas
 firebase_folder = '../Data/Images_to_firebase/'
@@ -185,9 +208,9 @@ for data_i in list_dates : #cambiar por list_dates
     cnt = cnt + 1
     analysis_date=output_folder+analysis_area+'/'+ data_i
     folder_out = firebase_folder+analysis_area+'/'+ data_i
-    Satellite_tools.area_crop(data_i,aoig_near,analysis_area,"_NDVI.tif", "_NDVI_lotes.tif",output_folder) #agregar folder origen y destion, lo mismo para la funcion
+    Satellite_tools.area_crop(data_i,aoig_near,analysis_area,"_NDVI.tif", "_NDVI_lotes.tif",output_folder) # //aoig_near
     Satellite_tools.plot_ndvi(data_i, analysis_area, "_NDVI_lotes.tif", "NDVI_Lote_&_Neighbors"+str(cnt)+".png", output_folder,'RdYlGn', -1, 1 ) # added cmap and limits
-    size_flag, datag = Stats_charts.data_g(data_i,analysis_date, aoig_near)
+    size_flag, datag = Stats_charts.data_g(data_i,analysis_date, todos_lotes) #//aoig_near
     if size_flag:
         print(data_i)
     else:
@@ -244,4 +267,4 @@ print("[INFO] images uploaded to Firebase")
 erase_yes = (args["erase"])
 if erase_yes == 'yes':
     shutil.rmtree(unzipped_folder, ignore_errors=True)
-print("[INFO] unzipped images erased")
+    print("[INFO] unzipped images erased")
