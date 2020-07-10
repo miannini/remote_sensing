@@ -17,9 +17,12 @@ import datetime
 from os import listdir
 from os.path import isfile, join
 import seaborn as sns
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import cv2
 import shutil
+import time
 from myfunctions import Fire_down
 from myfunctions import Cloud_finder
 from myfunctions import Sentinel_downloader
@@ -62,6 +65,8 @@ if user_analysis != 'no' :
 
 x_width = 768*2    #16km width
 y_height = 768*2   #16km height
+x_width_cloud = 512    #faster
+y_height_cloud = 512   #faster
 shape_folder = '../Data/shapefiles/'
 #funcion para leer firebase
 lote_aoi,lote_aoi_loc,minx,maxx,miny,maxy,bounding_box, user_analysis, analysis_area, Date_Ini, Date_Fin = Fire_down.find_poly(user_analysis,Date_Ini, Date_Fin, shape_folder)       
@@ -69,7 +74,7 @@ lote_aoi,lote_aoi_loc,minx,maxx,miny,maxy,bounding_box, user_analysis, analysis_
 print("[INFO] box coordinates (min_x, max_x = {:.2f}, {:.2f})".format(minx,maxx))
 print("[INFO] box coordinates (min_y, max_y = {:.2f}, {:.2f})".format(miny,maxy))
 print("[INFO] tiempo de analisis (fecha_inicial, fecha_final = {}, {})".format(Date_Ini, Date_Fin))
-print("[INFO] usuario y terreno de analisis (usuario, terreno= {} / {})".format(user_analysis, analysis_area))
+print("[INFO] usuario y terreno de analisis (usuario, terreno, finca= {} / {})".format(user_analysis,lote_aoi["name"]))
 
     
 #leer shapefile
@@ -82,24 +87,28 @@ for i in aoi_universal['geometry']:                             #area
 
 #leer shapefiles externos si es requerido
 folder_name = (args["shape"])
+#folder_name = 'external_shape' #'no'
 keep_own = (args["own"]) 
+#keep_own = 'no' #'yes' 
 if folder_name != "no":
-    todos_lotes = Ext_shape.merge_shapes(shape_folder,lote_aoi_loc,folder_name)
+    todos_lotes, todos_lotes_loc = Ext_shape.merge_shapes(shape_folder,lote_aoi,lote_aoi_loc,folder_name)
     #si se definio external shapefiles, aoig_near contendra la misma info
     if keep_own != 'yes':
         todos_lotes=todos_lotes.iloc[1:,:] #remove row 0 is firebase terrain
         print("[info] lote de firebase, removido del analisis")
-    aoig_near = todos_lotes
-    lote_aoi_loc = todos_lotes
+    aoig_near = todos_lotes_loc
+    lote_aoi_loc = todos_lotes_loc
     print("[info] lotes totales incluyendo de archivo externo = {}".format(len(todos_lotes)))
 
     
 #folder de imagenes nubes
 clouds_folder = '../Data/output_clouds/'
 Path(clouds_folder+analysis_area).mkdir(parents=True, exist_ok=True)   
-#cloud detection            
-best_date, valid_dates, clouds_data = Cloud_finder.cloud_process(bounding_box, Date_Ini, Date_Fin, x_width, y_height,analysis_area,clouds_folder)
-print(best_date)
+#cloud detection  
+start = time.time()          
+best_date, valid_dates, clouds_data = Cloud_finder.cloud_process(bounding_box, Date_Ini, Date_Fin, x_width_cloud, y_height_cloud,analysis_area,clouds_folder)
+end = time.time()
+print(best_date, end - start)
 
 #download images
 zipped_folder='../Data/Zipped_Images/'
@@ -154,7 +163,11 @@ for dire in direcciones:
     Satellite_tools.band_calc(date, analysis_area,'B03','B08','_NDWI',x_width,output_folder)
     Satellite_tools.plot_ndvi(date, analysis_area, "_NDWI.tif", "_NDWI_export.png",output_folder,'RdYlBu', -1, 0.4) #export png file
     Satellite_tools.plot_ndvi(date, analysis_area, "_BM.tif", "_BM_export.png",output_folder,'nipy_spectral_r', 2000, 3500) #max imposible 4500
-
+    Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_LAI.tif", "_LAI_lote.tif",output_folder )
+    Satellite_tools.plot_ndvi(date, analysis_area, "_LAI_lote.tif", "_LAI_analysis_lotes.png",output_folder,'nipy_spectral_r', 0, 3)
+    Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_BM.tif", "_BM_lote.tif",output_folder )
+    Satellite_tools.plot_ndvi(date, analysis_area, "_BM_lote.tif", "_BM_analysis_lotes.png",output_folder,'nipy_spectral_r', 2000, 3500)
+    
 #pasar esto a una funcion.
 #si se definir external shapes, no hacer esto. 
 if folder_name == "no":
@@ -187,7 +200,8 @@ if folder_name == "no":
     aoig['distance']=99999
     #calculate distance between centroids
     for n in range(1,len(aoig)):
-        aoig.iloc[n,3] = np.sqrt((aoig.iloc[n,1]-aoig.iloc[0,1])**2+(aoig.iloc[n,2]-aoig.iloc[0,2])**2)
+        #aoig.iloc[n,3] = np.sqrt((aoig.iloc[n,2]-aoig.iloc[0,2])**2+(aoig.iloc[n,3]-aoig.iloc[0,3])**2)
+        aoig.loc[n,'distance'] = np.sqrt((aoig.loc[n,'x']-aoig.loc[0,'x'])**2+(aoig.loc[n,'y']-aoig.loc[0,'y'])**2)
     #get 10 nearest polygons, with minimum distance of 500m
     aoig = aoig[aoig['distance']>=500]
     aoig_near = aoig.nsmallest(10, ['distance']) 
@@ -210,7 +224,7 @@ for data_i in list_dates : #cambiar por list_dates
     folder_out = firebase_folder+analysis_area+'/'+ data_i
     Satellite_tools.area_crop(data_i,aoig_near,analysis_area,"_NDVI.tif", "_NDVI_lotes.tif",output_folder) # //aoig_near
     Satellite_tools.plot_ndvi(data_i, analysis_area, "_NDVI_lotes.tif", "NDVI_Lote_&_Neighbors"+str(cnt)+".png", output_folder,'RdYlGn', -1, 1 ) # added cmap and limits
-    size_flag, datag = Stats_charts.data_g(data_i,analysis_date, todos_lotes) #//aoig_near
+    size_flag, datag = Stats_charts.data_g(data_i,analysis_date, aoig_near) #//aoig_near
     if size_flag:
         print(data_i)
     else:

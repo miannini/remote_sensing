@@ -3,8 +3,11 @@ import numpy as np
 import rasterio as rio
 from rasterio.mask import mask
 from osgeo import gdal_array
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from scipy.ndimage import interpolation
 import cv2
 #import math
 #from rasterio.mask import mask
@@ -39,19 +42,26 @@ class Satellite_tools:
             dest.write(out_image)
             
     def cld_msk(date, clouds_data, ind_mask, analysis_area,output_folder):
-        b4a = rio.open(output_folder+analysis_area+'/'+date[:8]+"B04.tif") #Automatizar nombre a 4 elemento del directorio
-        x_width = b4a.width
-        y_height = b4a.height
-        b4a.close()
-        #x_width,y_height
+        #define construction fixed band at 512 pxl and use always same
+        #base = rio.open(output_folder+analysis_area+'/'+"CLOUD_BASE.tif")
+        base = rio.open(output_folder+analysis_area+'/'+date[:8]+"B04.tif")
+        x_width = base.width
+        y_height = base.height
+        base.close()
         #cloud mask generate file
+        #src = output_folder+analysis_area+'/'+"CLOUD_BASE.tif"
         src = output_folder+analysis_area+'/'+date[:8]+"B04.tif"
-        arr = gdal_array.LoadFile(src) 
-        output = gdal_array.SaveArray(clouds_data[ind_mask], output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif", format="GTiff", prototype=src)
+        data = clouds_data[ind_mask]
+        scale = x_width/len(data[0])
+        data = data[0]
+        data_interpolated = interpolation.zoom(data,scale)
+        gdal_array.LoadFile(src) 
+        gdal_array.SaveArray(data_interpolated, output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif", format="GTiff", prototype=src)
+        #gdal_array.SaveArray(clouds_data[ind_mask], output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif", format="GTiff", prototype=src)
         #cloud mask generate file 2nd pass
-        src = output_folder+analysis_area+'/'+date[:8]+"B04.tif"
-        arr = gdal_array.LoadFile(src) 
-        output = gdal_array.SaveArray(clouds_data[ind_mask], output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif", format="GTiff", prototype=src)
+        #src = output_folder+analysis_area+'/'+date[:8]+"B04.tif"
+        #arr = gdal_array.LoadFile(src) 
+        #output = gdal_array.SaveArray(clouds_data[ind_mask], output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif", format="GTiff", prototype=src)
         return x_width, y_height
     
     def ndvi_calc(date, analysis_area,crop,output_folder):
@@ -102,39 +112,45 @@ class Satellite_tools:
         msk_cloud = rio.open(output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif")       
         b1 = rio.open(output_folder+analysis_area+'/'+date[:8]+band1+".tif")
         b2 = rio.open(output_folder+analysis_area+'/'+date[:8]+band2+".tif")
-        # read Red(b4) and NIR(b8) as arrays
         b1r = b1.read()
         b2r = b2.read()
         cld = msk_cloud.read()
-        # Allow division by zero
-        np.seterr(divide='ignore', invalid='ignore')
-        # Calculate (could be conditional for rest, sum or other complex)
-        calculated = (b1r.astype(float)-b2r.astype(float))/(b1r+b2r)
-        #for bands with 20m resolution, reshape cloud mask to scale size       
+        #for bands with resolution less than 10m, reshape band to scale size       
         if x_width > b1.width:
-            img = cv2.imread(output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif",-1)
-            scale_percent = b1.width/x_width # percent of original size
+            img = cv2.imread(output_folder+analysis_area+'/'+date[:8]+band1+".tif",-1)
+            scale_percent = x_width/b1.width # percent of original size
             width = int(img.shape[1] * scale_percent)
             height = int(img.shape[0] * scale_percent)
             dim = (width, height)
             resized = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
             resized = np.expand_dims(resized, axis=0)
-            calculated[resized==1] = None
-        else:
-            calculated[cld==1] = None
-        #calculated[cld==1] = None
+            b1r = resized
+        if x_width > b2.width:
+            img = cv2.imread(output_folder+analysis_area+'/'+date[:8]+band2+".tif",-1)
+            scale_percent = x_width/b2.width # percent of original size
+            width = int(img.shape[1] * scale_percent)
+            height = int(img.shape[0] * scale_percent)
+            dim = (width, height)
+            resized = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
+            resized = np.expand_dims(resized, axis=0)
+            b2r = resized
+            
+        # Allow division by zero
+        np.seterr(divide='ignore', invalid='ignore')
+        # Calculate (could be conditional for rest, sum or other complex)
+        calculated = (b1r.astype(float)-b2r.astype(float))/(b1r+b2r)
+        #correct by cloud mask
+        calculated[cld==1] = None
         msk_cloud.close()
         b1.close()
         b2.close()
         # Write the calculated image
-        meta = b1.meta
+        meta = msk_cloud.meta
         meta.update(driver='GTiff')
         meta.update(dtype=rio.float32)
         with rio.open(output_folder+analysis_area+'/'+date[:8]+name+".tif", 'w', **meta) as dst:
             dst.write(calculated.astype(rio.float32))
             dst.close()
-            b1.close()
-            b2.close()
     
     def plot_ndvi(date, analysis_area, source, destination,output_folder,cmap,min_loc,max_loc): #source="_NDVI.tif", destination="_NDVI_export.png", dest_folder="Output_Images/", cmap='RdYlGn'
         ndvi_plt = rio.open(output_folder+analysis_area+'/'+date[:8]+source) #"_NDVI.tif"

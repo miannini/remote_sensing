@@ -22,11 +22,12 @@ class Fire_down:
                  for item_terreno in item[1].values():
                      try:
                          if item_terreno['status'] == "Pendiente":
-                             pending.append(dict({"user" : usuario , "terrain": item_terreno['uid'], "timestamp" : item_terreno['timestamp']})) 
+                             pending.append(dict({"user" : usuario , "terrain": item_terreno['uid'], "timestamp" : item_terreno['timestamp'], "name":item_terreno['name']})) 
                      except:
                          pass
              pending = sorted(pending, key = lambda i: i['timestamp'],reverse=True)
              user_analysis = pending[0]['user']+"/"+pending[0]['terrain']
+             #name = pending[0]['name']
          if (Date_Ini == 'no'):
              request_date = firebase.get('coordinatesUser/'+user_analysis+'/timestamp', None) #Conseguir fecha
              time_window = firebase.get('coordinatesUser/'+user_analysis+'/years', None) #Conseguir ventana de tiempo
@@ -34,6 +35,7 @@ class Fire_down:
              Date_Fin = time.strftime('%Y-%m-%d', time.gmtime(int(request_date)/1000))
 
          result = firebase.get('/coordinatesUser/'+user_analysis+'/Coordenadas', None)
+         name = firebase.get('coordinatesUser/'+user_analysis+'/name', None) #Conseguir name lote
          lote_aoi = Polygon(result)
          polygons = []
          polygons.append(Polygon(lote_aoi))
@@ -50,6 +52,14 @@ class Fire_down:
          maxx = float(lote_aoi_loc["x"])+ (767.5*10)
          miny = float(lote_aoi_loc["y"])- (767.5*10)
          maxy = float(lote_aoi_loc["y"])+ (767.5*10)
+         #agregar nombre de lote
+         lote_aoi["name"]=name
+         lote_aoi_loc["name"]=name
+         cols=lote_aoi.columns.tolist() 
+         cols=cols[-1:]+cols[:-1] #reorder column names
+         lote_aoi = lote_aoi[cols]
+         lote_aoi_loc = lote_aoi_loc[cols]
+         
          
          #Creación del shape respecto a coordenas de vértices
          analysis_area = user_analysis.split("/")[1]
