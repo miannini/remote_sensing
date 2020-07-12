@@ -15,7 +15,8 @@ import cv2
 #more complex than rest
 
 class Satellite_tools:
-    def crop_sat(folder, name, aoi, analysis_area,output_folder):
+    def crop_sat(folder, name, aoi, analysis_area,output_folder, x_width):
+        #R10,ba,aoi,analysis_area,output_folder
         with rio.open(folder+name) as src:
             out_image, out_transform = rio.mask.mask(src, aoi.geometry,crop=True)
             out_meta = src.meta.copy()
@@ -26,6 +27,12 @@ class Satellite_tools:
             src.close()
         date,band = name.split("_")[1],name.split("_")[2] #agregué tercer argumento
         newname = output_folder+analysis_area+'/'+date[:8]+""+band[:3]+".tif"
+        scale = x_width/len(out_image[0])
+        if scale > 1.1:
+            data = out_image[0]
+            data_interpolated = interpolation.zoom(data,scale)
+            data_interpolated = np.expand_dims(data_interpolated, axis=0)
+            out_image = data_interpolated
         with rio.open(newname, "w", **out_meta) as dest:
             dest.write(out_image)
             dest.close()
@@ -151,6 +158,9 @@ class Satellite_tools:
         with rio.open(output_folder+analysis_area+'/'+date[:8]+name+".tif", 'w', **meta) as dst:
             dst.write(calculated.astype(rio.float32))
             dst.close()
+            b1.close()
+            b2.close()
+            msk_cloud.close()
     
     def plot_ndvi(date, analysis_area, source, destination,output_folder,cmap,min_loc,max_loc): #source="_NDVI.tif", destination="_NDVI_export.png", dest_folder="Output_Images/", cmap='RdYlGn'
         ndvi_plt = rio.open(output_folder+analysis_area+'/'+date[:8]+source) #"_NDVI.tif"

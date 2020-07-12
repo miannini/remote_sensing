@@ -95,12 +95,18 @@ if folder_name != "no":
     #si se definio external shapefiles, aoig_near contendra la misma info
     if keep_own != 'yes':
         todos_lotes=todos_lotes.iloc[1:,:] #remove row 0 is firebase terrain
+        todos_lotes_loc=todos_lotes_loc.iloc[1:,:] #remove row 0 is firebase terrain
         print("[info] lote de firebase, removido del analisis")
     aoig_near = todos_lotes_loc
     lote_aoi_loc = todos_lotes_loc
     print("[info] lotes totales incluyendo de archivo externo = {}".format(len(todos_lotes)))
+    lote_aoi_loc.to_csv (r'export_lotes.csv', index = False, header=True)
+    todos_lotes.to_csv (r'lotes_universal.csv', index = False, header=True)
+#restart indexes
+aoig_near.reset_index(drop=True, inplace=True)
+lote_aoi_loc.reset_index(drop=True, inplace=True)   
+todos_lotes.reset_index(drop=True, inplace=True)
 
-    
 #folder de imagenes nubes
 clouds_folder = '../Data/output_clouds/'
 Path(clouds_folder+analysis_area).mkdir(parents=True, exist_ok=True)   
@@ -143,8 +149,7 @@ for dire in direcciones:
     #crop bands
     for ba in onlyfiles:
         if 'TCI' not in ba:          
-            Satellite_tools.crop_sat(R10,ba,aoi,analysis_area,output_folder)
-    
+            Satellite_tools.crop_sat(R10,ba,aoi,analysis_area,output_folder,x_width)
     #cloud mask
     x_width_band, y_height_band = Satellite_tools.cld_msk(date, clouds_data, ind_mask, analysis_area,output_folder)
     
@@ -217,6 +222,8 @@ out = set(out)
 out = sorted(out)
 list_dates = [out[0],out[round(len(out)/2)],out[-1]]
 big_proto = []
+resumen_bandas = pd.DataFrame()
+table_bandas = pd.DataFrame()
 cnt = 0 #counter for image names
 for data_i in list_dates : #cambiar por list_dates
     cnt = cnt + 1
@@ -224,14 +231,23 @@ for data_i in list_dates : #cambiar por list_dates
     folder_out = firebase_folder+analysis_area+'/'+ data_i
     Satellite_tools.area_crop(data_i,aoig_near,analysis_area,"_NDVI.tif", "_NDVI_lotes.tif",output_folder) # //aoig_near
     Satellite_tools.plot_ndvi(data_i, analysis_area, "_NDVI_lotes.tif", "NDVI_Lote_&_Neighbors"+str(cnt)+".png", output_folder,'RdYlGn', -1, 1 ) # added cmap and limits
-    size_flag, datag = Stats_charts.data_g(data_i,analysis_date, aoig_near) #//aoig_near
+    size_flag, datag, short_ordenado, short_resume = Stats_charts.data_g(data_i,analysis_date, aoig_near, todos_lotes, output_folder) #//aoig_near
     if size_flag:
         print(data_i)
     else:
-        pd.DataFrame(big_proto.append(datag ))        
+        pd.DataFrame(big_proto.append(datag )) 
+        resumen_bandas = pd.concat([resumen_bandas,short_resume])
+        table_bandas = pd.concat([table_bandas,short_ordenado])
     #move NDVI images from output to firebase folder
     shutil.move(output_folder+analysis_area+'/'+ data_i+"NDVI_Lote_&_Neighbors"+str(cnt)+".png", firebase_folder+analysis_area+'/'+ data_i+"NDVI_Lote_&_Neighbors"+str(cnt)+".png")
     shutil.move(output_folder+analysis_area+'/'+ data_i+"_NDVI_analysis_lotes.png", firebase_folder+analysis_area+'/'+ data_i+"_NDVI_analysis_lotes.png")
+
+#exportar datos CSV
+database_folder = '../Data/Database/'
+Path(database_folder+analysis_area).mkdir(parents=True, exist_ok=True)
+table_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_lotes_medidas.csv', index = True, header=True)
+resumen_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_vertical_lotes_medidas.csv', index = True, header=True)
+print("[INFO] data table exported as CSV")
 
 
 big_proto_F = pd.concat(big_proto, axis = 0)
@@ -279,6 +295,7 @@ print("[INFO] images uploaded to Firebase")
 
 #delete downloaded unzipped images
 erase_yes = (args["erase"])
+#erase_yes='no'
 if erase_yes == 'yes':
     shutil.rmtree(unzipped_folder, ignore_errors=True)
     print("[INFO] unzipped images erased")
