@@ -100,8 +100,8 @@ if folder_name != "no":
     aoig_near = todos_lotes_loc
     lote_aoi_loc = todos_lotes_loc
     print("[info] lotes totales incluyendo de archivo externo = {}".format(len(todos_lotes)))
-    lote_aoi_loc.to_csv (r'export_lotes.csv', index = False, header=True)
-    todos_lotes.to_csv (r'lotes_universal.csv', index = False, header=True)
+    #lote_aoi_loc.to_csv (r'export_lotes.csv', index = False, header=True)
+    #todos_lotes.to_csv (r'lotes_universal.csv', index = False, header=True)
 #restart indexes
 aoig_near.reset_index(drop=True, inplace=True)
 lote_aoi_loc.reset_index(drop=True, inplace=True)   
@@ -134,6 +134,9 @@ output_folder='../Data/Output_Images/'
 Path(output_folder+analysis_area).mkdir(parents=True, exist_ok=True)
 R10=''
 date=''
+big_proto = []
+resumen_bandas = pd.DataFrame()
+table_bandas = pd.DataFrame()
 for dire in direcciones:
     R10=dire+'/'
     date= R10.split("_")[-2][:8]
@@ -172,6 +175,25 @@ for dire in direcciones:
     Satellite_tools.plot_ndvi(date, analysis_area, "_LAI_lote.tif", "_LAI_analysis_lotes.png",output_folder,'nipy_spectral_r', 0, 3)
     Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_BM.tif", "_BM_lote.tif",output_folder )
     Satellite_tools.plot_ndvi(date, analysis_area, "_BM_lote.tif", "_BM_analysis_lotes.png",output_folder,'nipy_spectral_r', 2000, 3500)
+    #database
+    if folder_name != "no":
+        analysis_date=output_folder+analysis_area+'/'+ date
+        size_flag, datag, short_ordenado, short_resume = Stats_charts.data_g(date,analysis_date, aoig_near, todos_lotes, output_folder) #//aoig_near
+        if size_flag:
+            print(data_i)
+        else:
+            pd.DataFrame(big_proto.append(datag )) 
+            resumen_bandas = pd.concat([resumen_bandas,short_resume])
+            table_bandas = pd.concat([table_bandas,short_ordenado])
+
+#exportar datos CSV
+if folder_name != "no":
+    database_folder = '../Data/Database/'
+    Path(database_folder+analysis_area).mkdir(parents=True, exist_ok=True)
+    table_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_lotes_medidas.csv', index = True, header=True)
+    resumen_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_vertical_lotes_medidas.csv', index = True, header=True)
+    print("[INFO] data table exported as CSV")
+
     
 #pasar esto a una funcion.
 #si se definir external shapes, no hacer esto. 
@@ -221,9 +243,6 @@ out = list( [x[0:8] for x in arr])
 out = set(out)
 out = sorted(out)
 list_dates = [out[0],out[round(len(out)/2)],out[-1]]
-big_proto = []
-resumen_bandas = pd.DataFrame()
-table_bandas = pd.DataFrame()
 cnt = 0 #counter for image names
 for data_i in list_dates : #cambiar por list_dates
     cnt = cnt + 1
@@ -231,23 +250,25 @@ for data_i in list_dates : #cambiar por list_dates
     folder_out = firebase_folder+analysis_area+'/'+ data_i
     Satellite_tools.area_crop(data_i,aoig_near,analysis_area,"_NDVI.tif", "_NDVI_lotes.tif",output_folder) # //aoig_near
     Satellite_tools.plot_ndvi(data_i, analysis_area, "_NDVI_lotes.tif", "NDVI_Lote_&_Neighbors"+str(cnt)+".png", output_folder,'RdYlGn', -1, 1 ) # added cmap and limits
-    size_flag, datag, short_ordenado, short_resume = Stats_charts.data_g(data_i,analysis_date, aoig_near, todos_lotes, output_folder) #//aoig_near
-    if size_flag:
-        print(data_i)
-    else:
-        pd.DataFrame(big_proto.append(datag )) 
-        resumen_bandas = pd.concat([resumen_bandas,short_resume])
-        table_bandas = pd.concat([table_bandas,short_ordenado])
+    if folder_name == "no":
+        size_flag, datag, short_ordenado, short_resume = Stats_charts.data_g(data_i,analysis_date, aoig_near, todos_lotes, output_folder) #//aoig_near
+        if size_flag:
+            print(data_i)
+        else:
+            pd.DataFrame(big_proto.append(datag )) 
+            resumen_bandas = pd.concat([resumen_bandas,short_resume])
+            table_bandas = pd.concat([table_bandas,short_ordenado])
     #move NDVI images from output to firebase folder
     shutil.move(output_folder+analysis_area+'/'+ data_i+"NDVI_Lote_&_Neighbors"+str(cnt)+".png", firebase_folder+analysis_area+'/'+ data_i+"NDVI_Lote_&_Neighbors"+str(cnt)+".png")
     shutil.move(output_folder+analysis_area+'/'+ data_i+"_NDVI_analysis_lotes.png", firebase_folder+analysis_area+'/'+ data_i+"_NDVI_analysis_lotes.png")
 
 #exportar datos CSV
-database_folder = '../Data/Database/'
-Path(database_folder+analysis_area).mkdir(parents=True, exist_ok=True)
-table_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_lotes_medidas.csv', index = True, header=True)
-resumen_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_vertical_lotes_medidas.csv', index = True, header=True)
-print("[INFO] data table exported as CSV")
+if folder_name == "no":
+    database_folder = '../Data/Database/'
+    Path(database_folder+analysis_area).mkdir(parents=True, exist_ok=True)
+    table_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_lotes_medidas.csv', index = True, header=True)
+    resumen_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_vertical_lotes_medidas.csv', index = True, header=True)
+    print("[INFO] data table exported as CSV")
 
 
 big_proto_F = pd.concat(big_proto, axis = 0)
