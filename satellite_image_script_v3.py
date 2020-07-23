@@ -85,13 +85,16 @@ footprint = None
 for i in aoi_universal['geometry']:                             #area
     footprint = i
 
+database_folder = '../Data/Database/'
+Path(database_folder+analysis_area).mkdir(parents=True, exist_ok=True)
+    
 #leer shapefiles externos si es requerido
 folder_name = (args["shape"])
 #folder_name = 'external_shape' #'no'
 keep_own = (args["own"]) 
 #keep_own = 'no' #'yes' 
 if folder_name != "no":
-    todos_lotes, todos_lotes_loc = Ext_shape.merge_shapes(shape_folder,lote_aoi,lote_aoi_loc,folder_name)
+    todos_lotes, todos_lotes_loc = Ext_shape.merge_shapes(shape_folder,lote_aoi,lote_aoi_loc,folder_name,analysis_area)
     #si se definio external shapefiles, aoig_near contendra la misma info
     if keep_own != 'yes':
         todos_lotes=todos_lotes.iloc[1:,:] #remove row 0 is firebase terrain
@@ -102,10 +105,15 @@ if folder_name != "no":
     print("[info] lotes totales incluyendo de archivo externo = {}".format(len(todos_lotes)))
     #lote_aoi_loc.to_csv (r'export_lotes.csv', index = False, header=True)
     #todos_lotes.to_csv (r'lotes_universal.csv', index = False, header=True)
-#restart indexes
-aoig_near.reset_index(drop=True, inplace=True)
-lote_aoi_loc.reset_index(drop=True, inplace=True)   
-todos_lotes.reset_index(drop=True, inplace=True)
+    #restart indexes
+    aoig_near.reset_index(drop=True, inplace=True)
+    lote_aoi_loc.reset_index(drop=True, inplace=True)   
+    todos_lotes.reset_index(drop=True, inplace=True)
+    #export to geojson
+    Path(shape_folder+analysis_area+'/multiples_json/').mkdir(parents=True, exist_ok=True)
+    for i in range(0,len(todos_lotes)):
+        temp = todos_lotes[todos_lotes.index == i] #filter geodataframe, keeping same format to export
+        temp.to_file(shape_folder+analysis_area+'/multiples_json/'+todos_lotes.iloc[i,0]+'.geojson', driver ='GeoJSON')
 
 #folder de imagenes nubes
 clouds_folder = '../Data/output_clouds/'
@@ -132,6 +140,7 @@ print(direcciones)
 #crop satellite images
 output_folder='../Data/Output_Images/'
 Path(output_folder+analysis_area).mkdir(parents=True, exist_ok=True)
+start = time.time() 
 R10=''
 date=''
 big_proto = []
@@ -180,17 +189,26 @@ for dire in direcciones:
         analysis_date=output_folder+analysis_area+'/'+ date
         size_flag, datag, short_ordenado, short_resume = Stats_charts.data_g(date,analysis_date, aoig_near, todos_lotes, output_folder) #//aoig_near
         if size_flag:
-            print(data_i)
+            print(date)
         else:
             pd.DataFrame(big_proto.append(datag )) 
             resumen_bandas = pd.concat([resumen_bandas,short_resume])
             table_bandas = pd.concat([table_bandas,short_ordenado])
+    print("[INFO] Date Analyzed = {}".format(date))
+end = time.time()
+print(end - start)    
 
+#convert from pivot table to dataframe
+flattened = pd.DataFrame(table_bandas.to_records())
+flattened.columns = [hdr.replace("('", "").replace("')", "").replace("', '", ".") for hdr in flattened.columns]
+#Biomass corrected value
+#mean_value._BM, sum_value._BM, area, count_pxl._cldmsk, sum_value._cldmsk
+flattened['cld_percentage']=flattened["sum_value._cldmsk"]/flattened["count_pxl._cldmsk"]
+flattened['area_factor']= (flattened["count_pxl._BM"]/flattened["count_pxl._cldmsk"])*((100*flattened["count_pxl._BM"])/flattened["area"]) #mayor a 1 se debe reducir, menor a 1 se debe sumar
+flattened['biomass_corrected'] = flattened["mean_value._BM"]*(flattened["area"]/(100*100))
 #exportar datos CSV
 if folder_name != "no":
-    database_folder = '../Data/Database/'
-    Path(database_folder+analysis_area).mkdir(parents=True, exist_ok=True)
-    table_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_lotes_medidas.csv', index = True, header=True)
+    flattened.to_csv (r'../Data/Database/'+analysis_area+'/resumen_lotes_medidas.csv', index = True, header=True)
     resumen_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_vertical_lotes_medidas.csv', index = True, header=True)
     print("[INFO] data table exported as CSV")
 
@@ -224,6 +242,7 @@ if folder_name == "no":
     aoig = gpd.GeoDataFrame(pd.concat([lote_aoi_loc,aoig_c], ignore_index=True), crs=lote_aoi_loc.crs)
     aoig["x"] = aoig.centroid.map(lambda p: p.x) 
     aoig["y"] = aoig.centroid.map(lambda p: p.y)
+    aoig["area"] = aoig.area
     aoig['distance']=99999
     #calculate distance between centroids
     for n in range(1,len(aoig)):
@@ -251,6 +270,7 @@ for data_i in list_dates : #cambiar por list_dates
     Satellite_tools.area_crop(data_i,aoig_near,analysis_area,"_NDVI.tif", "_NDVI_lotes.tif",output_folder) # //aoig_near
     Satellite_tools.plot_ndvi(data_i, analysis_area, "_NDVI_lotes.tif", "NDVI_Lote_&_Neighbors"+str(cnt)+".png", output_folder,'RdYlGn', -1, 1 ) # added cmap and limits
     if folder_name == "no":
+        todos_lotes = aoig_near
         size_flag, datag, short_ordenado, short_resume = Stats_charts.data_g(data_i,analysis_date, aoig_near, todos_lotes, output_folder) #//aoig_near
         if size_flag:
             print(data_i)
@@ -264,8 +284,6 @@ for data_i in list_dates : #cambiar por list_dates
 
 #exportar datos CSV
 if folder_name == "no":
-    database_folder = '../Data/Database/'
-    Path(database_folder+analysis_area).mkdir(parents=True, exist_ok=True)
     table_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_lotes_medidas.csv', index = True, header=True)
     resumen_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_vertical_lotes_medidas.csv', index = True, header=True)
     print("[INFO] data table exported as CSV")

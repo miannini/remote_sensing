@@ -52,6 +52,8 @@ class Fire_down:
          maxx = float(lote_aoi_loc["x"])+ (767.5*10)
          miny = float(lote_aoi_loc["y"])- (767.5*10)
          maxy = float(lote_aoi_loc["y"])+ (767.5*10)
+         lote_aoi_loc["area"] = float(lote_aoi_loc.area)
+         lote_aoi["area"] = lote_aoi_loc["area"] #copy area from local in meters
          #agregar nombre de lote
          lote_aoi["name"]=name
          lote_aoi_loc["name"]=name

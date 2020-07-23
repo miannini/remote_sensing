@@ -49,13 +49,25 @@ class Stats_charts:
         #df resumen
         short_resume = pd.DataFrame()
         for n in range(0,len(big)):
-            temp_resume = big[n].groupby(['date','poly','band']).agg(mean_value=('data_pixel', 'mean'), sum_value=('data_pixel', 'sum'), max_value=('data_pixel', 'max'), 
-                                                                     std_dev=('data_pixel', 'std'), count_pxl=('data_pixel', 'count'), perc_90 = ('data_pixel', lambda x: np.percentile(x,90)) )
+            temp_resume = big[n].groupby(['date','poly','band']).agg(mean_value=('data_pixel', 'mean'), sum_value=('data_pixel', 'sum'), min_value=('data_pixel', 'min'), 
+                                                                     max_value=('data_pixel', 'max'), 
+                                                                     std_dev=('data_pixel', 'std'), count_pxl=('data_pixel', 'count'), 
+                                                                     perc_10 = ('data_pixel', lambda x: np.percentile(x,10)),
+                                                                     perc_20 = ('data_pixel', lambda x: np.percentile(x,20)),
+                                                                     perc_30 = ('data_pixel', lambda x: np.percentile(x,30)),
+                                                                     perc_40 = ('data_pixel', lambda x: np.percentile(x,40)),
+                                                                     perc_50 = ('data_pixel', lambda x: np.percentile(x,50)),
+                                                                     perc_60 = ('data_pixel', lambda x: np.percentile(x,60)),
+                                                                     perc_70 = ('data_pixel', lambda x: np.percentile(x,70)),
+                                                                     perc_80 = ('data_pixel', lambda x: np.percentile(x,80)),
+                                                                     perc_90 = ('data_pixel', lambda x: np.percentile(x,90)) )
             short_resume = pd.concat([short_resume,temp_resume])      
         #unir datos lotes
         short_resume = short_resume.merge(todos_lotes, left_on='poly', right_index=True, how="left")
         short_resume = short_resume.drop(['geometry'], axis=1)
-        short_ord = pd.pivot_table(short_resume, index=['date',"poly","name","x","y"],columns="band", values=['mean_value','sum_value', 'max_value','std_dev','count_pxl','perc_90'])
+        short_ord = pd.pivot_table(short_resume, index=['date',"poly","name","x","y","area"],columns="band", values=['mean_value','std_dev','sum_value','count_pxl',
+                                                                                                                     'min_value','perc_10','perc_20','perc_30','perc_40',
+                                                                                                                     'perc_50','perc_60','perc_70','perc_80','perc_90','max_value'])
         return size_flag, datag, short_ord, short_resume
 
         
