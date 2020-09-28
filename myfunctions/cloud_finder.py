@@ -8,7 +8,7 @@ from myfunctions.tools import Cloudless_tools
 #cloud detection
 class Cloud_finder:
     def cloud_process(bounding_box, Date_Ini, Date_Fin, x_width, y_height,analysis_area,clouds_folder):
-        INSTANCE_ID = '7ede4d75-bfab-4796-ad5e-dd26ad97336b' #From Sentinel HUB Python Instance ID /change to dynamic user input
+        INSTANCE_ID = 'f3641ebd-7c36-432e-9562-67ba64cda499' #From Sentinel HUB Python Instance ID /change to dynamic user input
         LAYER_NAME = 'TRUE-COLOR-S2-L1C' # e.g. TRUE-COLOR-S2-L1C
         #Obtener imagenes por fecha (dentro de rango) dentro de box de interés
         wms_true_color_request = WmsRequest(layer=LAYER_NAME,
@@ -40,9 +40,9 @@ class Cloud_finder:
         
         
         #Mostrar las probabilidades de nubes para cada imagen por fecha en el rango de analisis
-        fig = plt.figure(figsize=(15, 10))
         n_cols = 4
         n_rows = int(np.ceil(len(wms_true_color_imgs) / n_cols))
+        fig = plt.figure(figsize=(n_cols*4,n_rows*3)) #, constrained_layout=False
         for idx, [prob, mask, data] in enumerate(all_cloud_masks):
             ax = fig.add_subplot(n_rows, n_cols, idx + 1)
             image = wms_true_color_imgs[idx]
@@ -50,9 +50,10 @@ class Cloud_finder:
         plt.tight_layout()
         plt.savefig(clouds_folder+analysis_area+'/real_and_cloud.png')
         #Mostrar las mascaras de nubes para cada imagen por fecha en el rango de analisis
-        fig = plt.figure(figsize=(15, 10))
+        #fig = plt.figure(figsize=(15, 10))
         n_cols = 4
         n_rows = int(np.ceil(len(wms_true_color_imgs) / n_cols))
+        fig = plt.figure(figsize=(n_cols*4,n_rows*3))
         for idx, cloud_mask in enumerate(all_cloud_masks.get_cloud_masks(threshold=0.35)): #se repite con linea 101
             ax = fig.add_subplot(n_rows, n_cols, idx + 1)
             Cloudless_tools.plot_cloud_mask(cloud_mask, fig=fig)  
@@ -64,9 +65,12 @@ class Cloud_finder:
         for a in range(0,len(each_cld_mask)):
             n_cloud_mask = np.shape(np.concatenate(each_cld_mask[a]))
             cloud_perc = sum(np.concatenate(each_cld_mask[a])== 1)/n_cloud_mask
-            cld_per_idx.append(cloud_perc)
+            cld_per_idx.append(cloud_perc.astype(float))
         x = pd.DataFrame(cld_per_idx)<0.6 #Menor a 60% de cobertura de nubes
         valid_dates = pd.DataFrame(all_cloud_masks.get_dates())[x[0]]
+        all_dates = pd.DataFrame(all_cloud_masks.get_dates())
+        all_dates['cld_percent'] = cld_per_idx
+        all_dates.to_csv (clouds_folder+analysis_area+'/fechas_porcentaje_nubes.csv', index = False, header=True)
         #print("[INFO] valid dates ... {:f})".format(valid_dates))
         
         #filter clouds dataframe with only valid dates
@@ -76,13 +80,15 @@ class Cloud_finder:
         best_date = best_date.iloc[0,0]
         
         #Mostrar las mascaras de nubes para cada imagen por fecha valida
-        fig = plt.figure(figsize=(15, 10))
+        #fig = plt.figure(figsize=(15, 10))
         n_cols = 4
         n_rows = int(np.ceil(len(clouds_data) / n_cols))
+        fig = plt.figure(figsize=(n_cols*4,n_rows*3))
         for idx, cloud_mask in enumerate(clouds_data):
             ax = fig.add_subplot(n_rows, n_cols, idx + 1)
             Cloudless_tools.plot_cloud_mask(cloud_mask, fig=fig)
         plt.tight_layout()
         plt.savefig(clouds_folder+analysis_area+'/cloud_masks_valid.png')
-
-        return best_date, valid_dates, clouds_data
+        
+        clear_pct = len(valid_dates)/len(cld_per_idx)
+        return best_date, valid_dates, clouds_data, clear_pct

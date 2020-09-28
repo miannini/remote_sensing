@@ -59,7 +59,8 @@ Date_Fin = (args["date_fin"])
 
 #inicializacion de variables - user / area
 user_analysis = (args["user"])
-#user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E'
+#user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E' # Simijaca
+#user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIAbLizOODQRp_OCDFX'
 if user_analysis != 'no' : 
     analysis_area = user_analysis.split("/")[1]
 
@@ -92,7 +93,7 @@ Path(database_folder+analysis_area).mkdir(parents=True, exist_ok=True)
 folder_name = (args["shape"])
 #folder_name = 'external_shape' #'no'
 keep_own = (args["own"]) 
-#keep_own = 'no' #'yes' 
+#keep_own = 'yes' 'no' #'yes' 
 if folder_name != "no":
     todos_lotes, todos_lotes_loc = Ext_shape.merge_shapes(shape_folder,lote_aoi,lote_aoi_loc,folder_name,analysis_area)
     #si se definio external shapefiles, aoig_near contendra la misma info
@@ -120,7 +121,7 @@ clouds_folder = '../Data/output_clouds/'
 Path(clouds_folder+analysis_area).mkdir(parents=True, exist_ok=True)   
 #cloud detection  
 start = time.time()          
-best_date, valid_dates, clouds_data = Cloud_finder.cloud_process(bounding_box, Date_Ini, Date_Fin, x_width_cloud, y_height_cloud,analysis_area,clouds_folder)
+best_date, valid_dates, clouds_data, clear_pct = Cloud_finder.cloud_process(bounding_box, Date_Ini, Date_Fin, x_width_cloud, y_height_cloud,analysis_area,clouds_folder)
 end = time.time()
 print(best_date, end - start)
 
@@ -131,7 +132,7 @@ Path(zipped_folder).mkdir(parents=True, exist_ok=True)
 Path(unzipped_folder+analysis_area).mkdir(parents=True, exist_ok=True)
 
 down_yes = (args["download"])
-#down_yes = 'no'
+#down_yes = 'yes'
 if down_yes == 'yes':
     Sentinel_downloader.image_down(footprint, Date_Ini, Date_Fin, valid_dates, analysis_area,zipped_folder,unzipped_folder)
 direcciones = Sentinel_downloader.get_routes(analysis_area,unzipped_folder)
