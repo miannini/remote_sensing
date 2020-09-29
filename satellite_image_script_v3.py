@@ -201,9 +201,11 @@ for dire in direcciones:
             pd.DataFrame(big_proto.append(datag )) 
             resumen_bandas = pd.concat([resumen_bandas,short_resume])
             table_bandas = pd.concat([table_bandas,short_ordenado])
+        #clear memory
+        del(size_flag, datag, short_ordenado, short_resume)
     print("[INFO] Date Analyzed = {}".format(date))
-    #clear memory
-    del(size_flag, datag, short_ordenado, short_resume)
+    
+    
 end = time.time()
 print(end - start)    
 
