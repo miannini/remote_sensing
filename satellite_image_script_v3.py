@@ -1,6 +1,9 @@
 # USAGE
 #todo declarado
 # python satellite_image_script_v3.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E --download yes --date_ini 2020-01-01 --date_fin 2020-01-31 --shape external_shape --own no --erase yes
+#todo declarado - sin external file
+# python satellite_image_script_v3.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIAbLizOODQRp_OCDFX --download yes --date_ini 2019-10-01 --date_fin 2020-09-30
+#
 #sin declarar nada
 # python satellite_image_script_v3.py
 # declarando solo fecha
@@ -60,7 +63,7 @@ Date_Fin = (args["date_fin"])
 #inicializacion de variables - user / area
 user_analysis = (args["user"])
 #user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E' # Simijaca
-#user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIAbLizOODQRp_OCDFX'
+#user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIAbLizOODQRp_OCDFX' #Riopaila
 if user_analysis != 'no' : 
     analysis_area = user_analysis.split("/")[1]
 
@@ -91,7 +94,7 @@ Path(database_folder+analysis_area).mkdir(parents=True, exist_ok=True)
     
 #leer shapefiles externos si es requerido
 folder_name = (args["shape"])
-#folder_name = 'external_shape' #'no'
+#folder_name = 'no' 'external_shape' #'no'
 keep_own = (args["own"]) 
 #keep_own = 'yes' 'no' #'yes' 
 if folder_name != "no":
@@ -137,6 +140,9 @@ if down_yes == 'yes':
     Sentinel_downloader.image_down(footprint, Date_Ini, Date_Fin, valid_dates, analysis_area,zipped_folder,unzipped_folder)
 direcciones = Sentinel_downloader.get_routes(analysis_area,unzipped_folder)
 print(direcciones)
+
+#release some memory
+del(lote_aoi,minx,maxx,miny,maxy,bounding_box,aoi_universal,footprint,start,end)
 
 #crop satellite images
 output_folder='../Data/Output_Images/'
@@ -196,6 +202,8 @@ for dire in direcciones:
             resumen_bandas = pd.concat([resumen_bandas,short_resume])
             table_bandas = pd.concat([table_bandas,short_ordenado])
     print("[INFO] Date Analyzed = {}".format(date))
+    #clear memory
+    del(size_flag, datag, short_ordenado, short_resume)
 end = time.time()
 print(end - start)    
 

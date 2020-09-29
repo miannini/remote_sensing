@@ -34,9 +34,9 @@ class Cloud_finder:
                                        instance_id=INSTANCE_ID)
         wms_bands = wms_bands_request.get_data()
         cloud_detector = S2PixelCloudDetector(threshold=0.35, average_over=8, dilation_size=3) #change threshold to test
-        cloud_probs = cloud_detector.get_cloud_probability_maps(np.array(wms_bands))
+        #cloud_probs = cloud_detector.get_cloud_probability_maps(np.array(wms_bands))
         cloud_masks = cloud_detector.get_cloud_masks(np.array(wms_bands))
-        all_cloud_masks = CloudMaskRequest(ogc_request=wms_bands_request, threshold=0.1)
+        all_cloud_masks = CloudMaskRequest(ogc_request=wms_bands_request, threshold=0.35)
         
         
         #Mostrar las probabilidades de nubes para cada imagen por fecha en el rango de analisis
@@ -54,21 +54,25 @@ class Cloud_finder:
         n_cols = 4
         n_rows = int(np.ceil(len(wms_true_color_imgs) / n_cols))
         fig = plt.figure(figsize=(n_cols*4,n_rows*3))
-        for idx, cloud_mask in enumerate(all_cloud_masks.get_cloud_masks(threshold=0.35)): #se repite con linea 101
+        each_cld_mask = all_cloud_masks.get_cloud_masks(threshold=0.35)
+        #for idx, cloud_mask in enumerate(all_cloud_masks.get_cloud_masks(threshold=0.35)):
+        for idx, cloud_mask in enumerate(each_cld_mask): #se repite con linea 101
             ax = fig.add_subplot(n_rows, n_cols, idx + 1)
             Cloudless_tools.plot_cloud_mask(cloud_mask, fig=fig)  
         plt.tight_layout()
         plt.savefig(clouds_folder+analysis_area+'/cloud_masks.png')
         #Calculo y extracción de imagenes con cobertura de nubes menor a x%
         cld_per_idx = []
-        each_cld_mask = all_cloud_masks.get_cloud_masks(threshold=0.35)                 #se repite con linea 94
+        #each_cld_mask = all_cloud_masks.get_cloud_masks(threshold=0.35)                 #se repite con linea 94
         for a in range(0,len(each_cld_mask)):
             n_cloud_mask = np.shape(np.concatenate(each_cld_mask[a]))
             cloud_perc = sum(np.concatenate(each_cld_mask[a])== 1)/n_cloud_mask
             cld_per_idx.append(cloud_perc.astype(float))
         x = pd.DataFrame(cld_per_idx)<0.6 #Menor a 60% de cobertura de nubes
-        valid_dates = pd.DataFrame(all_cloud_masks.get_dates())[x[0]]
         all_dates = pd.DataFrame(all_cloud_masks.get_dates())
+        #valid_dates = pd.DataFrame(all_cloud_masks.get_dates())[x[0]]
+        valid_dates = all_dates[x[0]]
+        #all_dates = pd.DataFrame(all_cloud_masks.get_dates())
         all_dates['cld_percent'] = cld_per_idx
         all_dates.to_csv (clouds_folder+analysis_area+'/fechas_porcentaje_nubes.csv', index = False, header=True)
         #print("[INFO] valid dates ... {:f})".format(valid_dates))
