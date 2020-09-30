@@ -55,8 +55,8 @@ class Cloud_finder:
         n_rows = int(np.ceil(len(wms_true_color_imgs) / n_cols))
         fig = plt.figure(figsize=(n_cols*4,n_rows*3))
         each_cld_mask = all_cloud_masks.get_cloud_masks(threshold=0.35)
-        #for idx, cloud_mask in enumerate(all_cloud_masks.get_cloud_masks(threshold=0.35)):
-        for idx, cloud_mask in enumerate(each_cld_mask): #se repite con linea 101
+        for idx, cloud_mask in enumerate(all_cloud_masks.get_cloud_masks(threshold=0.35)):
+        #for idx, cloud_mask in enumerate(each_cld_mask): #se repite con linea 101
             ax = fig.add_subplot(n_rows, n_cols, idx + 1)
             Cloudless_tools.plot_cloud_mask(cloud_mask, fig=fig)  
         plt.tight_layout()

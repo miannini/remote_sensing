@@ -135,7 +135,7 @@ Path(zipped_folder).mkdir(parents=True, exist_ok=True)
 Path(unzipped_folder+analysis_area).mkdir(parents=True, exist_ok=True)
 
 down_yes = (args["download"])
-#down_yes = 'yes'
+#down_yes = 'no' 'yes'
 if down_yes == 'yes':
     Sentinel_downloader.image_down(footprint, Date_Ini, Date_Fin, valid_dates, analysis_area,zipped_folder,unzipped_folder)
 direcciones = Sentinel_downloader.get_routes(analysis_area,unzipped_folder)
@@ -159,6 +159,7 @@ for dire in direcciones:
     #find cloud mask date file    
     ind_mask = []
     date_obj = datetime.datetime.strptime(date, '%Y%m%d')
+    print("[INFO] Date to Analyze = {}".format(date))
     for i in range(0,len(valid_dates)):
         date_msk = valid_dates.iloc[i,0].date()    
         if date_obj.date() == date_msk:
@@ -191,6 +192,7 @@ for dire in direcciones:
     Satellite_tools.plot_ndvi(date, analysis_area, "_LAI_lote.tif", "_LAI_analysis_lotes.png",output_folder,'nipy_spectral_r', 0, 3)
     Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_BM.tif", "_BM_lote.tif",output_folder )
     Satellite_tools.plot_ndvi(date, analysis_area, "_BM_lote.tif", "_BM_analysis_lotes.png",output_folder,'nipy_spectral_r', 2000, 3500)
+    matplotlib.pyplot.close("all")
     #database
     if folder_name != "no":
         analysis_date=output_folder+analysis_area+'/'+ date

@@ -44,9 +44,11 @@ class Satellite_tools:
             out_meta.update({"driver": "GTiff",
                          "height": out_image.shape[1],
                          "width": out_image.shape[2],
-                         "transform": out_transform})    
+                         "transform": out_transform})  
+            src.close()
         with rio.open(output_folder+analysis_area+'/'+date[:8]+destination, "w", **out_meta) as dest:
             dest.write(out_image)
+            dest.close()
             
     def cld_msk(date, clouds_data, ind_mask, analysis_area,output_folder):
         #define construction fixed band at 512 pxl and use always same
@@ -180,6 +182,7 @@ class Satellite_tools:
         plt.colorbar(im, cax=cax)
         plt.savefig(output_folder+analysis_area+'/'+date[:8]+destination,bbox_inches='tight',dpi=500)
         plt.clf()
+        ndvi_plt.close()
         
     def trns_coor(area,meta):
         x, y = meta['transform'][2]+area[0]*10, meta['transform'][5]+area[1]*-10
