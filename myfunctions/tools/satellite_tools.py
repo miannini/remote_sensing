@@ -27,6 +27,14 @@ class Satellite_tools:
             src.close()
         date,band = name.split("_")[1],name.split("_")[2] #agregué tercer argumento
         newname = output_folder+analysis_area+'/'+date[:8]+""+band[:3]+".tif"
+        #in case of asymmetryc shapes  
+        dif_dims = out_image.shape[1] - out_image.shape[2]
+        if dif_dims < 0 :
+            out_image_c = out_image[:,:,abs(dif_dims):]
+        elif dif_dims > 0 :
+            out_image_c = out_image[:,abs(dif_dims):,:]
+        out_image =  out_image_c      
+        
         scale = x_width/len(out_image[0])
         if scale > 1.1:
             data = out_image[0]
