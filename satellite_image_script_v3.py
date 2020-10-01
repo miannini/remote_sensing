@@ -204,23 +204,24 @@ for dire in direcciones:
             resumen_bandas = pd.concat([resumen_bandas,short_resume])
             table_bandas = pd.concat([table_bandas,short_ordenado])
         #clear memory
-        del(size_flag, datag, short_ordenado, short_resume)
+        #del(size_flag, datag, short_ordenado, short_resume)
     print("[INFO] Date Analyzed = {}".format(date))
     
     
 end = time.time()
 print(end - start)    
+del(valid_dates, clouds_data, clear_pct )
 
-#convert from pivot table to dataframe
-flattened = pd.DataFrame(table_bandas.to_records())
-flattened.columns = [hdr.replace("('", "").replace("')", "").replace("', '", ".") for hdr in flattened.columns]
-#Biomass corrected value
-#mean_value._BM, sum_value._BM, area, count_pxl._cldmsk, sum_value._cldmsk
-flattened['cld_percentage']=flattened["sum_value._cldmsk"]/flattened["count_pxl._cldmsk"]
-flattened['area_factor']= (flattened["count_pxl._BM"]/flattened["count_pxl._cldmsk"])*((100*flattened["count_pxl._BM"])/flattened["area"]) #mayor a 1 se debe reducir, menor a 1 se debe sumar
-flattened['biomass_corrected'] = flattened["mean_value._BM"]*(flattened["area"]/(100*100))
 #exportar datos CSV
 if folder_name != "no":
+    #convert from pivot table to dataframe
+    flattened = pd.DataFrame(table_bandas.to_records())
+    flattened.columns = [hdr.replace("('", "").replace("')", "").replace("', '", ".") for hdr in flattened.columns]
+    #Biomass corrected value
+    #mean_value._BM, sum_value._BM, area, count_pxl._cldmsk, sum_value._cldmsk
+    flattened['cld_percentage']=flattened["sum_value._cldmsk"]/flattened["count_pxl._cldmsk"]
+    flattened['area_factor']= (flattened["count_pxl._BM"]/flattened["count_pxl._cldmsk"])*((100*flattened["count_pxl._BM"])/flattened["area"]) #mayor a 1 se debe reducir, menor a 1 se debe sumar
+    flattened['biomass_corrected'] = flattened["mean_value._BM"]*(flattened["area"]/(100*100))
     flattened.to_csv (r'../Data/Database/'+analysis_area+'/resumen_lotes_medidas.csv', index = True, header=True)
     resumen_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_vertical_lotes_medidas.csv', index = True, header=True)
     print("[INFO] data table exported as CSV")
