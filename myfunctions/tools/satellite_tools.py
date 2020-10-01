@@ -30,10 +30,10 @@ class Satellite_tools:
         #in case of asymmetryc shapes  
         dif_dims = out_image.shape[1] - out_image.shape[2]
         if dif_dims < 0 :
-            out_image_c = out_image[:,:,abs(dif_dims):]
+            out_image = out_image[:,:,abs(dif_dims):]
         elif dif_dims > 0 :
-            out_image_c = out_image[:,abs(dif_dims):,:]
-        out_image =  out_image_c      
+            out_image = out_image[:,abs(dif_dims):,:]
+        #out_image =  out_image_c      
         
         scale = x_width/len(out_image[0])
         if scale > 1.1:
