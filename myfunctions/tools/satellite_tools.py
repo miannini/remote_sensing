@@ -132,9 +132,16 @@ class Satellite_tools:
         b1r = b1.read()
         b2r = b2.read()
         cld = msk_cloud.read()
+            
+        #scale here also
         #for bands with resolution less than 10m, reshape band to scale size       
         if x_width > b1.width:
             img = cv2.imread(output_folder+analysis_area+'/'+date[:8]+band1+".tif",-1)
+            dif_dims = img.shape[0] - img.shape[1]
+            if dif_dims < 0 :
+                img = img[:,abs(dif_dims):]
+            elif dif_dims > 0 :
+                img = img[abs(dif_dims):,:]
             scale_percent = x_width/b1.width # percent of original size
             width = int(img.shape[1] * scale_percent)
             height = int(img.shape[0] * scale_percent)
@@ -144,6 +151,11 @@ class Satellite_tools:
             b1r = resized
         if x_width > b2.width:
             img = cv2.imread(output_folder+analysis_area+'/'+date[:8]+band2+".tif",-1)
+            dif_dims = img.shape[0] - img.shape[1]
+            if dif_dims < 0 :
+                img = img[:,abs(dif_dims):]
+            elif dif_dims > 0 :
+                img = img[abs(dif_dims):,:]
             scale_percent = x_width/b2.width # percent of original size
             width = int(img.shape[1] * scale_percent)
             height = int(img.shape[0] * scale_percent)

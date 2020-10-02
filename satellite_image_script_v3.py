@@ -57,13 +57,14 @@ args = vars(ap.parse_args())
 #inicializacion de variables - fechas
 Date_Ini = (args["date_ini"]) 
 Date_Fin = (args["date_fin"]) 
-#Date_Ini='2020-01-01'
-#Date_Fin='2020-01-31'
+#Date_Ini='2020-09-21'
+#Date_Fin='2020-09-23'
 
 #inicializacion de variables - user / area
 user_analysis = (args["user"])
 #user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E' # Simijaca
 #user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIAbLizOODQRp_OCDFX' #Riopaila
+#user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIAboyeRxGdI7C0oWCl' #Sogamoso
 if user_analysis != 'no' : 
     analysis_area = user_analysis.split("/")[1]
 
