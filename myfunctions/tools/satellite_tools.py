@@ -29,21 +29,29 @@ class Satellite_tools:
         newname = output_folder+analysis_area+'/'+date[:8]+""+band[:3]+".tif"
         #in case of asymmetryc shapes  
         dif_dims = out_image.shape[1] - out_image.shape[2]
-        if dif_dims < 0 :
-            out_image = out_image[:,:,abs(dif_dims):]
-        elif dif_dims > 0 :
-            out_image = out_image[:,abs(dif_dims):,:]
-        #out_image =  out_image_c      
-        
-        scale = x_width/len(out_image[0])
-        if scale > 1.1:
-            data = out_image[0]
-            data_interpolated = interpolation.zoom(data,scale)
-            data_interpolated = np.expand_dims(data_interpolated, axis=0)
-            out_image = data_interpolated
-        with rio.open(newname, "w", **out_meta) as dest:
-            dest.write(out_image)
-            dest.close()
+        max_dim = max(out_image.shape[1],out_image.shape[2])
+        dif_perc = dif_dims/max_dim
+        if dif_perc > 0.25:
+            skip = True
+        else:
+            skip = False
+        if skip == False:
+            if dif_dims < 0 :
+                out_image = out_image[:,:,abs(dif_dims):]
+            elif dif_dims > 0 :
+                out_image = out_image[:,abs(dif_dims):,:]
+            #out_image =  out_image_c      
+            
+            scale = x_width/len(out_image[0])
+            if scale > 1.1:
+                data = out_image[0]
+                data_interpolated = interpolation.zoom(data,scale)
+                data_interpolated = np.expand_dims(data_interpolated, axis=0)
+                out_image = data_interpolated
+            with rio.open(newname, "w", **out_meta) as dest:
+                dest.write(out_image)
+                dest.close()
+        return skip
     
     def area_crop(date,aoi2,analysis_area,source, destination, output_folder): #"_NDVI.tif", "_NDVI_lote.tif","Output_Images/" 
         with rio.open(output_folder+analysis_area+'/'+date[:8]+source) as src:

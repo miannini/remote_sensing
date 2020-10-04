@@ -57,14 +57,15 @@ args = vars(ap.parse_args())
 #inicializacion de variables - fechas
 Date_Ini = (args["date_ini"]) 
 Date_Fin = (args["date_fin"]) 
-#Date_Ini='2020-09-21'
-#Date_Fin='2020-09-23'
+#Date_Ini='2020-03-16'
+#Date_Fin='2020-03-18'
 
 #inicializacion de variables - user / area
 user_analysis = (args["user"])
 #user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E' # Simijaca
 #user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIAbLizOODQRp_OCDFX' #Riopaila
 #user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIAboyeRxGdI7C0oWCl' #Sogamoso
+#user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIAdI8GCpbfGLPY3KyM' #Uberrimo
 if user_analysis != 'no' : 
     analysis_area = user_analysis.split("/")[1]
 
@@ -157,6 +158,7 @@ table_bandas = pd.DataFrame()
 for dire in direcciones:
     R10=dire+'/'
     date= R10.split("_")[-2][:8]
+    zone= R10.split("_")[-4][:]
     #find cloud mask date file    
     ind_mask = []
     date_obj = datetime.datetime.strptime(date, '%Y%m%d')
@@ -170,7 +172,10 @@ for dire in direcciones:
     #crop bands
     for ba in onlyfiles:
         if 'TCI' not in ba:          
-            Satellite_tools.crop_sat(R10,ba,aoi,analysis_area,output_folder,x_width)
+            skip = Satellite_tools.crop_sat(R10,ba,aoi,analysis_area,output_folder,x_width)
+    if skip == True:
+        print("[INFO] fecha {}, zona {} recortada ... skip".format(date,zone))
+        continue
     #cloud mask
     x_width_band, y_height_band = Satellite_tools.cld_msk(date, clouds_data, ind_mask, analysis_area,output_folder)
     
@@ -206,7 +211,7 @@ for dire in direcciones:
             table_bandas = pd.concat([table_bandas,short_ordenado])
         #clear memory
         #del(size_flag, datag, short_ordenado, short_resume)
-    print("[INFO] Date Analyzed = {}".format(date))
+    print("[INFO] Date, zone Analyzed = {} - {}".format(date,zone))
     
     
 end = time.time()
