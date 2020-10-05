@@ -142,8 +142,15 @@ class Satellite_tools:
         cld = msk_cloud.read()
             
         #scale here also
+        img = cv2.imread(output_folder+analysis_area+'/'+date[:8]+band1+".tif",-1)
+        dif_dims = img.shape[0] - img.shape[1]
+        if dif_dims < 0 :
+            img = img[:,abs(dif_dims):]
+        elif dif_dims > 0 :
+            img = img[abs(dif_dims):,:]
         #for bands with resolution less than 10m, reshape band to scale size       
         if x_width > b1.width:
+            '''
             img = cv2.imread(output_folder+analysis_area+'/'+date[:8]+band1+".tif",-1)
             dif_dims = img.shape[0] - img.shape[1]
             if dif_dims < 0 :
@@ -151,13 +158,23 @@ class Satellite_tools:
             elif dif_dims > 0 :
                 img = img[abs(dif_dims):,:]
             scale_percent = x_width/b1.width # percent of original size
+            '''
+            scale_percent = x_width/img.shape[1]
             width = int(img.shape[1] * scale_percent)
             height = int(img.shape[0] * scale_percent)
             dim = (width, height)
             resized = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
             resized = np.expand_dims(resized, axis=0)
             b1r = resized
+        
+        img2 = cv2.imread(output_folder+analysis_area+'/'+date[:8]+band2+".tif",-1)
+        dif_dims2 = img2.shape[0] - img2.shape[1]
+        if dif_dims2 < 0 :
+            img2 = img2[:,abs(dif_dims2):]
+        elif dif_dims2 > 0 :
+            img2 = img2[abs(dif_dims2):,:]
         if x_width > b2.width:
+            '''
             img = cv2.imread(output_folder+analysis_area+'/'+date[:8]+band2+".tif",-1)
             dif_dims = img.shape[0] - img.shape[1]
             if dif_dims < 0 :
@@ -165,12 +182,14 @@ class Satellite_tools:
             elif dif_dims > 0 :
                 img = img[abs(dif_dims):,:]
             scale_percent = x_width/b2.width # percent of original size
-            width = int(img.shape[1] * scale_percent)
-            height = int(img.shape[0] * scale_percent)
-            dim = (width, height)
-            resized = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
-            resized = np.expand_dims(resized, axis=0)
-            b2r = resized
+            '''
+            scale_percent2 = x_width/img2.shape[1]
+            width2 = int(img2.shape[1] * scale_percent2)
+            height2 = int(img2.shape[0] * scale_percent2)
+            dim2 = (width2, height2)
+            resized2 = cv2.resize(img2, dim2, interpolation = cv2.INTER_AREA)
+            resized2 = np.expand_dims(resized2, axis=0)
+            b2r = resized2
             
         # Allow division by zero
         np.seterr(divide='ignore', invalid='ignore')
