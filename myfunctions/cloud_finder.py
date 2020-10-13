@@ -2,13 +2,14 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import shapefile
+import datetime
 from sentinelhub import WmsRequest, BBox, CRS, MimeType, CustomUrlParam, get_area_dates
 from s2cloudless import S2PixelCloudDetector, CloudMaskRequest
 from myfunctions.tools import Cloudless_tools
 #cloud detection
 class Cloud_finder:
     def cloud_process(bounding_box, Date_Ini, Date_Fin, x_width, y_height,analysis_area,clouds_folder):
-        INSTANCE_ID = 'f3641ebd-7c36-432e-9562-67ba64cda499' #From Sentinel HUB Python Instance ID /change to dynamic user input
+        INSTANCE_ID = 'e8757ad9-2099-4dd9-89c9-6d20fcaa96ab' #From Sentinel HUB Python Instance ID /change to dynamic user input
         LAYER_NAME = 'TRUE-COLOR-S2-L1C' # e.g. TRUE-COLOR-S2-L1C
         #Obtener imagenes por fecha (dentro de rango) dentro de box de interés
         wms_true_color_request = WmsRequest(layer=LAYER_NAME,
@@ -16,9 +17,16 @@ class Cloud_finder:
                                             time=(Date_Ini, Date_Fin), #cambiar a fechas de interés
                                             width=x_width, height=y_height,
                                             image_format=MimeType.PNG,
+                                            time_difference=datetime.timedelta(hours=2),
                                             instance_id=INSTANCE_ID)
         wms_true_color_imgs = wms_true_color_request.get_data()
         #Cloudless_tools.plot_previews(np.asarray(wms_true_color_imgs), wms_true_color_request.get_dates(), cols=4, figsize=(15, 10))
+        
+        #count of 0's to know how empty is the image
+        count_of_zeros = []
+        for n in range(0,len(wms_true_color_imgs)):
+            # zeros / 4 channels * width * height (pixels)
+            count_of_zeros.append((np.count_nonzero(wms_true_color_imgs[n]==0))/(4*wms_true_color_imgs[n][:,:,0].shape[0]*wms_true_color_imgs[n][:,:,0].shape[1]))
         
         #Calculo de probabilidades y obtención de mascaras de nubes
         bands_script = 'return [B01,B02,B04,B05,B08,B8A,B09,B10,B11,B12]'
@@ -31,8 +39,12 @@ class Cloud_finder:
                                        time=(Date_Ini, Date_Fin),
                                        width=x_width, height=y_height,
                                        image_format=MimeType.TIFF_d32f,
+                                       time_difference=datetime.timedelta(hours=2),
                                        instance_id=INSTANCE_ID)
         wms_bands = wms_bands_request.get_data()
+        wms_bands_request.get_filename_list()
+        wms_bands_request.get_url_list()
+        
         cloud_detector = S2PixelCloudDetector(threshold=0.35, average_over=8, dilation_size=3) #change threshold to test
         #cloud_probs = cloud_detector.get_cloud_probability_maps(np.array(wms_bands))
         cloud_masks = cloud_detector.get_cloud_masks(np.array(wms_bands))

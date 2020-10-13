@@ -2,6 +2,9 @@ import os
 import pandas as pd
 import zipfile
 from sentinelsat import SentinelAPI
+from geopandas import GeoSeries
+import geopandas as gpd
+from shapely.geometry import Polygon
 user = 'miannini'
 password = 'An4lytics@89'
 api = SentinelAPI(user, password, 'https://scihub.copernicus.eu/dhus')
@@ -20,17 +23,31 @@ class Sentinel_downloader:
         products_gdf = api.to_geodataframe(products)
         products_gdf_sorted = products_gdf.sort_values(['beginposition'], ascending=[True]) #products_gdf.sort_values(['cloudcoverpercentage']
         
+        #Measure intersection areas, to omit images with partial data
+        dif = products_gdf_sorted['geometry'].difference(footprint)
+        dif.area       #result = 0.963322
+        intersec = products_gdf_sorted['geometry'].intersection(footprint)
+        intersec.area  #result = 0.019214
+        contains = products_gdf_sorted['geometry'].contains(footprint)
+        max_inter = max(intersec.area)
+        #intersec.area >= (max_inter - max_inter*0.2)
+        
         #Leer el listado de imagenes por fechas en las que el porcentaje de nubes calculado sea menor al valor indicado
         file_list = []
         for b in range(0,len(products_gdf_sorted)):
             api_id = str(products_gdf_sorted.iloc[b,7]).split()[0]
             for c in range(0,len(valid_dates)):
                 valid_dates_id = str(valid_dates.iloc[c,0]).split()[0]
-                if(api_id==valid_dates_id):
+                #date of sentinel file and date of clouds valid are equal / and / intersection area of tile is near maximum
+                #if(api_id==valid_dates_id and intersec.area[b]>= (max_inter - max_inter*0.2)): #20% tolerance of area missing
+                if(api_id==valid_dates_id and products_gdf_sorted['geometry'][b].contains(footprint)): #20% tolerance of area missing
                     file = products_gdf_sorted['uuid'][b]
                     title = products_gdf_sorted['title'][b]
                     file_list.append(file)
                     print(file,title)
+        
+        #unique files // remove because of duplicated dates in clouds analysis
+        file_list = list(dict.fromkeys(file_list))
         #Descarga de Imagenes por bandas
         for n in file_list:
             api.download(n, zipped_folder)

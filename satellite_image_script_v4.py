@@ -29,7 +29,7 @@ import time
 from myfunctions import Fire_down
 from myfunctions import Cloud_finder
 from myfunctions import Sentinel_downloader
-from myfunctions.tools import Satellite_tools
+from myfunctions import Satellite_proc
 from myfunctions import Contour_detect
 from myfunctions.temp_stats import Stats_charts
 from myfunctions import Upload_fire
@@ -57,8 +57,8 @@ args = vars(ap.parse_args())
 #inicializacion de variables - fechas
 Date_Ini = (args["date_ini"]) 
 Date_Fin = (args["date_fin"]) 
-#Date_Ini='2020-01-20'
-#Date_Fin='2020-01-31'
+#Date_Ini='2020-01-01'
+#Date_Fin='2020-01-15'
 
 #inicializacion de variables - user / area
 user_analysis = (args["user"])
@@ -178,32 +178,15 @@ for dire in direcciones:
     #crop bands
     for ba in onlyfiles:
         if 'TCI' not in ba:          
-            skip = Satellite_tools.crop_sat(R10,ba,aoi,analysis_area,output_folder,x_width)
+            skip = Satellite_proc.crop_sat(R10,ba,aoi,analysis_area,output_folder,x_width)
     if skip == True:
         print("[INFO] fecha {}, zona {} recortada ... skip".format(date,zone))
         continue
     #cloud mask
-    x_width_band, y_height_band = Satellite_tools.cld_msk(date, clouds_data, ind_mask, analysis_area,output_folder)
+    x_width_band, y_height_band = Satellite_proc.cld_msk(date, clouds_data, ind_mask, analysis_area,output_folder)
     
     #calculate NDVI
-    meta = Satellite_tools.ndvi_calc(date, analysis_area,'grass',output_folder) #calculate NDVI, crop='grass'
-    Satellite_tools.plot_ndvi(date, analysis_area, "_NDVI.tif", "_NDVI_export.png",output_folder,'RdYlGn', -1, 1) #export png file
-    Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_NDVI.tif", "_NDVI_lote.tif",output_folder ) #crop tif to small area analysis // lote_aoi_loc
-    Satellite_tools.plot_ndvi(date, analysis_area, "_NDVI_lote.tif", "_NDVI_analysis_lotes.png",output_folder,'RdYlGn', -1, 1) #export png of small area analysis
-    #calculate moisture
-    Satellite_tools.band_calc(date, analysis_area,'B8A','B11','_MOIST',x_width,output_folder)
-    Satellite_tools.plot_ndvi(date, analysis_area, "_MOIST.tif", "_MOIST_export.png",output_folder,'RdYlBu', -1, 1) #export png file
-    Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_MOIST.tif", "_MOIST_lote.tif",output_folder ) #crop tif to small area analysis  //lote_aoi_loc
-    Satellite_tools.plot_ndvi(date, analysis_area, "_MOIST_lote.tif", "_MOIST_analysis_lotes.png",output_folder,'RdYlBu', -1, 1) #export png of small area analysis
-    #plot Leaf Area Index and Bio-Mass (calculated in ndvi_calc)
-    Satellite_tools.plot_ndvi(date, analysis_area, "_LAI.tif", "_LAI_export.png",output_folder,'nipy_spectral_r', 0, 3) #max imposible 6.3
-    Satellite_tools.band_calc(date, analysis_area,'B03','B08','_NDWI',x_width,output_folder)
-    Satellite_tools.plot_ndvi(date, analysis_area, "_NDWI.tif", "_NDWI_export.png",output_folder,'RdYlBu', -1, 0.4) #export png file
-    Satellite_tools.plot_ndvi(date, analysis_area, "_BM.tif", "_BM_export.png",output_folder,'nipy_spectral_r', 2000, 3500) #max imposible 4500
-    Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_LAI.tif", "_LAI_lote.tif",output_folder )
-    Satellite_tools.plot_ndvi(date, analysis_area, "_LAI_lote.tif", "_LAI_analysis_lotes.png",output_folder,'nipy_spectral_r', 0, 3)
-    Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_BM.tif", "_BM_lote.tif",output_folder )
-    Satellite_tools.plot_ndvi(date, analysis_area, "_BM_lote.tif", "_BM_analysis_lotes.png",output_folder,'nipy_spectral_r', 2000, 3500)
+    meta = Satellite_proc.band_calc(date, analysis_area,x_width,output_folder) #calculate NDVI, crop='grass'
     matplotlib.pyplot.close("all")
     #database
     if folder_name != "no":
@@ -293,8 +276,8 @@ for data_i in list_dates : #cambiar por list_dates
     cnt = cnt + 1
     analysis_date=output_folder+analysis_area+'/'+ data_i
     folder_out = firebase_folder+analysis_area+'/'+ data_i
-    Satellite_tools.area_crop(data_i,aoig_near,analysis_area,"_NDVI.tif", "_NDVI_lotes.tif",output_folder) # //aoig_near
-    Satellite_tools.plot_ndvi(data_i, analysis_area, "_NDVI_lotes.tif", "NDVI_Lote_&_Neighbors"+str(cnt)+".png", output_folder,'RdYlGn', -1, 1 ) # added cmap and limits
+    Satellite_proc.area_crop(data_i,aoig_near,analysis_area,"_NDVI.tif", "_NDVI_lotes.tif",output_folder) # //aoig_near
+    #Satellite_proc.plot_ndvi(data_i, analysis_area, "_NDVI_lotes.tif", "NDVI_Lote_&_Neighbors"+str(cnt)+".png", output_folder,'RdYlGn', -1, 1 ) # added cmap and limits
     if folder_name == "no":
         todos_lotes = aoig_near
         size_flag, datag, short_ordenado, short_resume = Stats_charts.data_g(data_i,analysis_date, aoig_near, todos_lotes, output_folder) #//aoig_near
@@ -305,8 +288,8 @@ for data_i in list_dates : #cambiar por list_dates
             resumen_bandas = pd.concat([resumen_bandas,short_resume])
             table_bandas = pd.concat([table_bandas,short_ordenado])
     #move NDVI images from output to firebase folder
-    shutil.move(output_folder+analysis_area+'/'+ data_i+"NDVI_Lote_&_Neighbors"+str(cnt)+".png", firebase_folder+analysis_area+'/'+ data_i+"NDVI_Lote_&_Neighbors"+str(cnt)+".png")
-    shutil.move(output_folder+analysis_area+'/'+ data_i+"_NDVI_analysis_lotes.png", firebase_folder+analysis_area+'/'+ data_i+"_NDVI_analysis_lotes.png")
+    #shutil.move(output_folder+analysis_area+'/'+ data_i+"NDVI_Lote_&_Neighbors"+str(cnt)+".png", firebase_folder+analysis_area+'/'+ data_i+"NDVI_Lote_&_Neighbors"+str(cnt)+".png")
+    #shutil.move(output_folder+analysis_area+'/'+ data_i+"_NDVI_analysis_lotes.png", firebase_folder+analysis_area+'/'+ data_i+"_NDVI_analysis_lotes.png")
 
 #exportar datos CSV
 if folder_name == "no":
