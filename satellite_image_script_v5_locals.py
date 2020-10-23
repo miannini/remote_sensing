@@ -10,6 +10,9 @@
 # python satellite_image_script_v3.py --download no --date_ini 2020-01-01 --date_fin 2020-01-31
 # declarando solo user
 # python satellite_image_script_v3.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E --download no
+#analisis de imagenes locales
+# python satellite_image_script_v5_locals.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIAbLizOODQRp_OCDFX --date_ini 2020-01-05 --date_fin 2020-01-30 --local local
+
 ## leer librerias
 import numpy as np
 import pandas as pd
@@ -29,7 +32,7 @@ import time
 from myfunctions import Fire_down
 from myfunctions import Cloud_finder
 from myfunctions import Sentinel_downloader
-from myfunctions.tools import Satellite_tools
+from myfunctions import Satellite_proc
 from myfunctions import Contour_detect
 from myfunctions.temp_stats import Stats_charts
 from myfunctions import Upload_fire
@@ -52,13 +55,15 @@ ap.add_argument("-o", "--own", type=str, default='yes',
 	help="keep own terrain (only in conjunction with external shapes)")
 ap.add_argument("-e", "--erase", type=str, default='no',
 	help="define if erase unzipped images yes/no")
+ap.add_argument("-l", "--local", type=str, default='no',
+	help="define path of local images to use user_local/cloud/no")
 args = vars(ap.parse_args())
 
 #inicializacion de variables - fechas
 Date_Ini = (args["date_ini"]) 
 Date_Fin = (args["date_fin"]) 
-#Date_Ini='2020-09-01'
-#Date_Fin='2020-09-14'
+#Date_Ini='2019-10-01'
+#Date_Fin='2020-10-20'
 
 #inicializacion de variables - user / area
 user_analysis = (args["user"])
@@ -70,6 +75,8 @@ user_analysis = (args["user"])
 #user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIykncYYNNNfVETEh-v' #Bioenergy_puerto_lopez
 #user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIyk5QHhyIGAnlsH3RJ' #hoyo rico
 #user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIzHZ9Kr8cUvkQyBgY5' #Ibague_arroz
+#user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MKK7Su7NDUn_-iY1DdQ' #guasimo
+#user_analysis = 'no' # auto
 
 if user_analysis != 'no' : 
     analysis_area = user_analysis.split("/")[1]
@@ -142,12 +149,16 @@ if folder_name != "no":
 #folder de imagenes nubes
 clouds_folder = '../Data/output_clouds/'
 Path(clouds_folder+analysis_area).mkdir(parents=True, exist_ok=True)   
-#cloud detection  
-start = time.time()          
-best_date, valid_dates, clouds_data, clear_pct, number_cld_analysis = Cloud_finder.cloud_process(bounding_box, Date_Ini, Date_Fin, x_width_cloud, y_height_cloud,analysis_area,clouds_folder,lote_aoi,municipio, departamento)
-end = time.time()
-dif = end - start
-print("[INFO] best date without clouds={}, total time (secs)={:.2f}, clear pctg of all dates={}%".format(best_date,dif,clear_pct*100))
+#cloud detection
+#check if local clouds will be used
+local_files = (args["local"]) 
+#local_files = 'local' 'no' #'cloud' 
+if local_files =='no':  
+    start = time.time()          
+    best_date, valid_dates, clouds_data, clear_pct, number_cld_analysis = Cloud_finder.cloud_process(bounding_box, Date_Ini, Date_Fin, x_width_cloud, y_height_cloud,analysis_area,clouds_folder,lote_aoi,municipio, departamento)
+    end = time.time()
+    dif = end - start
+    print("[INFO] best date without clouds={}, total time (secs)={:.2f}, clear pctg of all dates={}%".format(best_date,dif,clear_pct*100))
 
 
 #download images
@@ -167,82 +178,105 @@ direcciones = Sentinel_downloader.get_routes(analysis_area,unzipped_folder)
 print(direcciones)
 
 #release some memory
-del(lote_aoi,minx,maxx,miny,maxy,bounding_box,aoi_universal,footprint,start,end)
+del(lote_aoi,minx,maxx,miny,maxy,bounding_box,aoi_universal,footprint)
 
 #crop satellite images
 output_folder='../Data/Output_Images/'
 Path(output_folder+analysis_area).mkdir(parents=True, exist_ok=True)
 start = time.time() 
-R10=''
-date=''
 big_proto = []
 resumen_bandas = pd.DataFrame()
 table_bandas = pd.DataFrame()
-for dire in direcciones:
-    R10=dire+'/'
-    date= R10.split("_")[-2][:8]
-    zone= R10.split("_")[-4][:]
-    #find cloud mask date file    
-    ind_mask = []
-    date_obj = datetime.datetime.strptime(date, '%Y%m%d')
-    print("[INFO] Date to Analyze = {}".format(date))
-    for i in range(0,len(valid_dates)):
-        date_msk = valid_dates.iloc[i,0].date()    
-        if date_obj.date() == date_msk:
-            ind_mask.append(i)
+if local_files =='no': 
+    R10=''
+    date=''
+    for dire in direcciones:
+        R10=dire+'/'
+        date= R10.split("_")[-2][:8]
+        zone= R10.split("_")[-4][:]
+        #find cloud mask date file    
+        ind_mask = []
+        date_obj = datetime.datetime.strptime(date, '%Y%m%d')
+        print("[INFO] Date to Analyze = {}".format(date))
+        for i in range(0,len(valid_dates)):
+            date_msk = valid_dates.iloc[i,0].date()    
+            if date_obj.date() == date_msk:
+                ind_mask.append(i)
+        #list bands
+        onlyfiles = [f for f in listdir(R10) if isfile(join(R10, f))]
+        #crop bands
+        for ba in onlyfiles:
+            if 'TCI' not in ba:          
+                skip = Satellite_proc.crop_sat(R10,ba,aoi,analysis_area,output_folder,x_width)
+        if skip == True:
+            print("[INFO] fecha {}, zona {} recortada ... skip".format(date,zone))
+            continue
+        #cloud mask
+        x_width_band, y_height_band = Satellite_proc.cld_msk(date, clouds_data, ind_mask, analysis_area,output_folder)
+        
+        #calculate NDVI
+        meta = Satellite_proc.band_calc(date, analysis_area,x_width,output_folder) #calculate NDVI, crop='grass'
+        matplotlib.pyplot.close("all")
+        #database
+        if folder_name != "no":
+            analysis_date=output_folder+analysis_area+'/'+ date
+            size_flag, datag, short_ordenado, short_resume = Stats_charts.data_g(date,analysis_date, aoig_near, todos_lotes, output_folder, analysis_area) #//aoig_near
+            if size_flag:
+                print(date)
+            else:
+                pd.DataFrame(big_proto.append(datag )) 
+                resumen_bandas = pd.concat([resumen_bandas,short_resume])
+                table_bandas = pd.concat([table_bandas,short_ordenado])
+            #clear memory
+            #del(size_flag, datag, short_ordenado, short_resume)
+        print("[INFO] Date, zone Analyzed = {} - {}".format(date,zone))
+    #write log to DB at end of process
+    #processed_data = pd.read_csv (r'../Data/Database/DB_datos_proecsados.csv', index_col=0)   
+    processed_df = pd.DataFrame(data={'user' : [user_analysis.split("/")[0]], 'terrain':[analysis_area], 'municipio':[municipio] , 'departamento':[departamento] ,'initial_date' : [Date_Ini] ,'final_date' : [Date_Fin], 'last_valid_date' : [max(valid_dates[0])], 'number_valid_date' : [len(valid_dates[0])], 'number_analyzed_images': [number_cld_analysis] , 'processed_date' : [datetime.date.today()]})    
+    processed_df.to_csv (r'../Data/Database/DB_datos_proecsados.csv', index = True, header=False, mode='a')
+        
+    #local files
+elif local_files == 'local':
+    bands = ["B01.tif","B02.tif","B03.tif","B04.tif","B05.tif","B06.tif","B07.tif","B08.tif","B09.tif","B10.tif","B11.tif","B12.tif","B8A.tif","_cldmsk.tif"]
     #list bands
-    onlyfiles = [f for f in listdir(R10) if isfile(join(R10, f))]
-    #crop bands
-    for ba in onlyfiles:
-        if 'TCI' not in ba:          
-            skip = Satellite_tools.crop_sat(R10,ba,aoi,analysis_area,output_folder,x_width)
-    if skip == True:
-        print("[INFO] fecha {}, zona {} recortada ... skip".format(date,zone))
-        continue
-    #cloud mask
-    x_width_band, y_height_band = Satellite_tools.cld_msk(date, clouds_data, ind_mask, analysis_area,output_folder)
-    
-    #calculate NDVI
-    meta = Satellite_tools.ndvi_calc(date, analysis_area,'grass',output_folder) #calculate NDVI, crop='grass'
-    Satellite_tools.plot_ndvi(date, analysis_area, "_NDVI.tif", "_NDVI_export.png",output_folder,'RdYlGn', -1, 1) #export png file
-    Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_NDVI.tif", "_NDVI_lote.tif",output_folder ) #crop tif to small area analysis // lote_aoi_loc
-    Satellite_tools.plot_ndvi(date, analysis_area, "_NDVI_lote.tif", "_NDVI_analysis_lotes.png",output_folder,'RdYlGn', -1, 1) #export png of small area analysis
-    #calculate moisture
-    Satellite_tools.band_calc(date, analysis_area,'B8A','B11','_MOIST',x_width,output_folder)
-    Satellite_tools.plot_ndvi(date, analysis_area, "_MOIST.tif", "_MOIST_export.png",output_folder,'RdYlBu', -1, 1) #export png file
-    Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_MOIST.tif", "_MOIST_lote.tif",output_folder ) #crop tif to small area analysis  //lote_aoi_loc
-    Satellite_tools.plot_ndvi(date, analysis_area, "_MOIST_lote.tif", "_MOIST_analysis_lotes.png",output_folder,'RdYlBu', -1, 1) #export png of small area analysis
-    #plot Leaf Area Index and Bio-Mass (calculated in ndvi_calc)
-    Satellite_tools.plot_ndvi(date, analysis_area, "_LAI.tif", "_LAI_export.png",output_folder,'nipy_spectral_r', 0, 3) #max imposible 6.3
-    Satellite_tools.band_calc(date, analysis_area,'B03','B08','_NDWI',x_width,output_folder)
-    Satellite_tools.plot_ndvi(date, analysis_area, "_NDWI.tif", "_NDWI_export.png",output_folder,'RdYlBu', -1, 0.4) #export png file
-    Satellite_tools.plot_ndvi(date, analysis_area, "_BM.tif", "_BM_export.png",output_folder,'nipy_spectral_r', 2000, 3500) #max imposible 4500
-    Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_LAI.tif", "_LAI_lote.tif",output_folder )
-    Satellite_tools.plot_ndvi(date, analysis_area, "_LAI_lote.tif", "_LAI_analysis_lotes.png",output_folder,'nipy_spectral_r', 0, 3)
-    Satellite_tools.area_crop(date,lote_aoi_loc,analysis_area,"_BM.tif", "_BM_lote.tif",output_folder )
-    Satellite_tools.plot_ndvi(date, analysis_area, "_BM_lote.tif", "_BM_analysis_lotes.png",output_folder,'nipy_spectral_r', 2000, 3500)
-    matplotlib.pyplot.close("all")
-    #database
-    if folder_name != "no":
-        analysis_date=output_folder+analysis_area+'/'+ date
-        size_flag, datag, short_ordenado, short_resume = Stats_charts.data_g(date,analysis_date, aoig_near, todos_lotes, output_folder, analysis_area) #//aoig_near
-        if size_flag:
-            print(date)
+    onlyfiles = [f for f in listdir(output_folder+analysis_area) if isfile(join(output_folder+analysis_area, f))]
+    matching = [s for s in onlyfiles if any(s[-7:] ==  b for b in bands)]
+    dates = list(set([(m[:8]) for m in matching ]))
+    count_of_clouds = pd.DataFrame()       
+    for date in dates:
+        #calculate indexes
+        print("[INFO] Date to Analyze = {}".format(date))
+        meta, cld_pxl_count = Satellite_proc.band_calc(date, analysis_area,x_width,output_folder) #calculate NDVI, crop='grass'
+        matplotlib.pyplot.close("all")
+        #dataframe for best_date image
+        if count_of_clouds.empty:
+            count_of_clouds = pd.DataFrame(data={'date' : [date], 'clear_pxl_count':[cld_pxl_count]})
         else:
-            pd.DataFrame(big_proto.append(datag )) 
-            resumen_bandas = pd.concat([resumen_bandas,short_resume])
-            table_bandas = pd.concat([table_bandas,short_ordenado])
-        #clear memory
-        #del(size_flag, datag, short_ordenado, short_resume)
-    print("[INFO] Date, zone Analyzed = {} - {}".format(date,zone))
-
-#processed_data = pd.read_csv (r'../Data/Database/DB_datos_proecsados.csv', index_col=0)   
-processed_df = pd.DataFrame(data={'user' : [user_analysis.split("/")[0]], 'terrain':[analysis_area], 'municipio':[municipio] , 'departamento':[departamento] ,'initial_date' : [Date_Ini] ,'final_date' : [Date_Fin], 'last_valid_date' : [max(valid_dates[0])], 'number_valid_date' : [len(valid_dates[0])], 'number_analyzed_images': [number_cld_analysis] , 'processed_date' : [datetime.date.today()]})    
-processed_df.to_csv (r'../Data/Database/DB_datos_proecsados.csv', index = True, header=False, mode='a')
-
+            count_of_clouds = count_of_clouds.append(pd.DataFrame(data={'date' : [date], 'clear_pxl_count':[cld_pxl_count]}))
+        
+        #database
+        if folder_name != "no":
+            analysis_date=date
+            size_flag, datag, short_ordenado, short_resume = Stats_charts.data_g(date,analysis_date, aoig_near, todos_lotes, output_folder, analysis_area) #//aoig_near
+            if size_flag:
+                print(date)
+            else:
+                pd.DataFrame(big_proto.append(datag )) 
+                resumen_bandas = pd.concat([resumen_bandas,short_resume])
+                table_bandas = pd.concat([table_bandas,short_ordenado])
+            #clear memory
+            #del(size_flag, datag, short_ordenado, short_resume)
+        print("[INFO] Date, user_analysis Analyzed = {} - {}".format(date,analysis_area))
+    #write log to DB at end of process
+    form_date = datetime.datetime.strptime(max(dates),'%Y%m%d').strftime('%d/%m/%Y %H:%M')
+    processed_df = pd.DataFrame(data={'user' : [user_analysis.split("/")[0]], 'terrain':[analysis_area], 'municipio':[municipio] , 'departamento':[departamento] ,'initial_date' : [Date_Ini] ,'final_date' : [Date_Fin], 'last_valid_date' : [form_date], 'number_valid_date' : [len(dates)], 'number_analyzed_images': [len(dates)] , 'processed_date' : [datetime.date.today()]})    
+    processed_df.to_csv (r'../Data/Database/DB_datos_proecsados.csv', index = True, header=False, mode='a')
+        
+#else: #'cloud'
 end = time.time()
-print(end - start)    
-del(valid_dates, clouds_data, clear_pct, number_cld_analysis)
+print(end - start)   
+
+best_date = count_of_clouds.loc[count_of_clouds.groupby('date')['clear_pxl_count'].idxmax()].date[0]
 
 #exportar datos CSV
 if folder_name != "no":
@@ -263,8 +297,10 @@ if folder_name != "no":
 #si se definir external shapes, no hacer esto. 
 if folder_name == "no":
     #contornos
-    best_date = str(best_date.date()).replace('-','')
-    edged2, canvas = Contour_detect.read_image_tif(best_date,analysis_area,"_NDVI.tif",output_folder) #leer imagen y generar fondo negro
+    if local_files =='no':
+        best_date = str(best_date.date()).replace('-','')
+    
+    edged2, canvas = Contour_detect.read_image_tif(best_date,analysis_area,"_ndvi.tif",output_folder) #leer imagen y generar fondo negro
     lotesa_res = Contour_detect.identif_forms(edged2,50,10,200,1) #50 deteccion de contornos basado en NDVI 50/255 separador
     lotesb_res = Contour_detect.identif_forms(edged2,205,10,200,3) #205 deteccion de contornos basado en NDVI 205/255 separador
     #transformar coordenadas
@@ -314,11 +350,11 @@ for data_i in list_dates : #cambiar por list_dates
     cnt = cnt + 1
     analysis_date=output_folder+analysis_area+'/'+ data_i
     folder_out = firebase_folder+analysis_area+'/'+ data_i
-    Satellite_tools.area_crop(data_i,aoig_near,analysis_area,"_NDVI.tif", "_NDVI_lotes.tif",output_folder) # //aoig_near
-    Satellite_tools.plot_ndvi(data_i, analysis_area, "_NDVI_lotes.tif", "NDVI_Lote_&_Neighbors"+str(cnt)+".png", output_folder,'RdYlGn', -1, 1 ) # added cmap and limits
+    Satellite_proc.area_crop(data_i,aoig_near,analysis_area,"_ndvi.tif", "_NDVI_lotes.tif",output_folder)# //aoig_near
+    #Satellite_proc.plot_ndvi(data_i, analysis_area, "_NDVI_lotes.tif", "NDVI_Lote_&_Neighbors"+str(cnt)+".png", output_folder,'RdYlGn', -1, 1 ) # added cmap and limits
     if folder_name == "no":
         todos_lotes = aoig_near
-        size_flag, datag, short_ordenado, short_resume = Stats_charts.data_g(data_i,analysis_date, aoig_near, todos_lotes, output_folder, analysis_area) #//aoig_near
+        size_flag, datag, short_ordenado, short_resume = Stats_charts.data_g(data_i,analysis_date, aoig_near, todos_lotes, output_folder,analysis_area) #//aoig_near
         if size_flag:
             print(data_i)
         else:
@@ -326,8 +362,8 @@ for data_i in list_dates : #cambiar por list_dates
             resumen_bandas = pd.concat([resumen_bandas,short_resume])
             table_bandas = pd.concat([table_bandas,short_ordenado])
     #move NDVI images from output to firebase folder
-    shutil.move(output_folder+analysis_area+'/'+ data_i+"NDVI_Lote_&_Neighbors"+str(cnt)+".png", firebase_folder+analysis_area+'/'+ data_i+"NDVI_Lote_&_Neighbors"+str(cnt)+".png")
-    shutil.move(output_folder+analysis_area+'/'+ data_i+"_NDVI_analysis_lotes.png", firebase_folder+analysis_area+'/'+ data_i+"_NDVI_analysis_lotes.png")
+    #shutil.move(output_folder+analysis_area+'/'+ data_i+"NDVI_Lote_&_Neighbors"+str(cnt)+".png", firebase_folder+analysis_area+'/'+ data_i+"NDVI_Lote_&_Neighbors"+str(cnt)+".png")
+    #shutil.move(output_folder+analysis_area+'/'+ data_i+"_NDVI_analysis_lotes.png", firebase_folder+analysis_area+'/'+ data_i+"_NDVI_analysis_lotes.png")
 
 #exportar datos CSV
 if folder_name == "no":

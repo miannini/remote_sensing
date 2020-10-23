@@ -129,15 +129,32 @@ class Satellite_proc:
             data_interpolated = np.expand_dims(data_interpolated, axis=0)
             return data_interpolated
         
-        b1r_c = scale_20(b1r)
-        b5r_c = scale_20(b5r)
-        b6r_c = scale_20(b6r)
-        b7r_c = scale_20(b7r)
-        b8ar_c = scale_20(b8ar)
-        b9r_c = scale_20(b9r)
-        b10r_c = scale_20(b10r)
-        b11r_c = scale_20(b11r)
-        b12r_c = scale_20(b12r)
+        def mirror_dims(band):
+            dif_dims = band.shape[1] - band.shape[2]
+            max_dim = max(band.shape[1],band.shape[2])
+            dif_perc = dif_dims/max_dim
+            if dif_perc > 0.05:
+                skip = True
+            else:
+                skip = False
+            if skip == False:
+                if dif_dims < 0 :
+                    band = band[:,:,abs(dif_dims):]
+                elif dif_dims > 0 :
+                    band = band[:,abs(dif_dims):,:]
+                return band     
+                
+                
+        
+        b1r_c = scale_20(mirror_dims(b1r))
+        b5r_c = scale_20(mirror_dims(b5r))
+        b6r_c = scale_20(mirror_dims(b6r))
+        b7r_c = scale_20(mirror_dims(b7r))
+        b8ar_c = scale_20(mirror_dims(b8ar))
+        b9r_c = scale_20(mirror_dims(b9r))
+        b10r_c = scale_20(mirror_dims(b10r))
+        b11r_c = scale_20(mirror_dims(b11r))
+        b12r_c = scale_20(mirror_dims(b12r))
         
         '''
         blue=492 +/- 66, green=560 +/- 36, red=664 +/- 31, nir=833 +/- 106  [10 meter] RGB and NIR
@@ -169,6 +186,7 @@ class Satellite_proc:
         #s2 CP and NDF from paper, b1=560, b2=665, b3=865, b4=2202
         cp = 7.63-54.39*green.astype(float)/10000 + 31.37*red.astype(float)/10000 +21.23*b8ar_c.astype(float)/10000 -25.33*b12r_c.astype(float)/10000 #Crude Protein
         ndf = 54.49+207.53*green.astype(float)/10000 -193.99*red.astype(float)/10000 -54.19*b8ar_c.astype(float)/10000 +111.15*b12r_c.astype(float)/10000 #Neutral Detergent Fiber
+        cld_pxl_count = (np.count_nonzero(cld==0))/(cld[0].shape[0]*cld[0].shape[1])
         
         indexes = [ndvi,ndwi,ccci,ci_g,atsavi,savi,ndmi,gvmi,cvi,dswi,lai,bm,bwdrvi,bri,cp,ndf]
         
@@ -283,7 +301,7 @@ class Satellite_proc:
         for exb in expanded_bands:
             export_tif(exb)
         '''
-        return meta   
+        return meta, cld_pxl_count  
         
                  
 

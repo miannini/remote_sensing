@@ -10,7 +10,7 @@ password = 'An4lytics@89'
 api = SentinelAPI(user, password, 'https://scihub.copernicus.eu/dhus')
 
 class Sentinel_downloader:
-    def image_down(footprint, Date_Ini, Date_Fin, valid_dates, analysis_area,zipped_folder,unzipped_folder):
+    def image_down(footprint, Date_Ini, Date_Fin, valid_dates, analysis_area,zipped_folder,unzipped_folder,lotes_uni):
         Date_Ini_c = Date_Ini.replace('-','')
         Date_Fin_c = Date_Fin.replace('-','')
         products = api.query(footprint,
@@ -30,7 +30,7 @@ class Sentinel_downloader:
         intersec.area  #result = 0.019214
         contains = products_gdf_sorted['geometry'].contains(footprint)
         max_inter = max(intersec.area)
-        #intersec.area >= (max_inter - max_inter*0.2)
+        #intersec.area >= (max_inter - max_inter*0.3)
         
         #Leer el listado de imagenes por fechas en las que el porcentaje de nubes calculado sea menor al valor indicado
         file_list = []
@@ -39,8 +39,9 @@ class Sentinel_downloader:
             for c in range(0,len(valid_dates)):
                 valid_dates_id = str(valid_dates.iloc[c,0]).split()[0]
                 #date of sentinel file and date of clouds valid are equal / and / intersection area of tile is near maximum
-                #if(api_id==valid_dates_id and intersec.area[b]>= (max_inter - max_inter*0.2)): #20% tolerance of area missing
-                if(api_id==valid_dates_id and products_gdf_sorted['geometry'][b].contains(footprint)): #20% tolerance of area missing
+                #if(api_id==valid_dates_id and products_gdf_sorted['geometry'][b].contains(footprint)):
+                if(api_id==valid_dates_id and 
+                   (products_gdf_sorted['geometry'][b].contains(footprint) or (products_gdf_sorted['geometry'][b].contains(lotes_uni) and intersec.area[b] >= max_inter - max_inter*0.3))): #20% tolerance of area missing
                     file = products_gdf_sorted['uuid'][b]
                     title = products_gdf_sorted['title'][b]
                     file_list.append(file)

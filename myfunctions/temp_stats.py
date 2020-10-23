@@ -25,10 +25,10 @@ def full_append(data,x):
     return pd.concat(FA)
 
 class Stats_charts:
-    def data_g(data_i,analysis_date, aoig_near,todos_lotes,output_folder):
+    def data_g(data_i,analysis_date, aoig_near,todos_lotes,output_folder,analysis_area):
         #bands_avail
         bands_avail = []
-        for root, dirs, files in os.walk(output_folder):
+        for root, dirs, files in os.walk(output_folder+analysis_area):
             for file in files:
                 if file.endswith(".tif") and "_lote" not in file:
                     bands_avail.append(file[8:])
