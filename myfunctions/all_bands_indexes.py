@@ -2,6 +2,8 @@
 import numpy as np
 import rasterio as rio
 from rasterio.mask import mask
+from rasterio.merge import merge
+from rasterio.plot import show
 from osgeo import gdal_array
 import matplotlib
 matplotlib.use('Agg')
@@ -33,7 +35,7 @@ class Satellite_proc:
         #in case of asymmetryc shapes  
         dif_dims = out_image.shape[1] - out_image.shape[2]
         max_dim = max(out_image.shape[1],out_image.shape[2])
-        dif_perc = dif_dims/max_dim
+        dif_perc = abs(dif_dims)/max_dim
         if dif_perc > 0.05:
             skip = True
         else:
@@ -132,7 +134,7 @@ class Satellite_proc:
         def mirror_dims(band):
             dif_dims = band.shape[1] - band.shape[2]
             max_dim = max(band.shape[1],band.shape[2])
-            dif_perc = dif_dims/max_dim
+            dif_perc = abs(dif_dims)/max_dim
             if dif_perc > 0.05:
                 skip = True
             else:
@@ -303,10 +305,35 @@ class Satellite_proc:
         '''
         return meta, cld_pxl_count  
         
-                 
-
-    
-        
     def trns_coor(area,meta):
-        x, y = meta['transform'][2]+area[0]*10, meta['transform'][5]+area[1]*-10
+        try:
+            x, y = meta['transform'][2]+area[0]*10, meta['transform'][5]+area[1]*-10
+        except:
+            x, y = meta[0]['transform'][2]+area[0]*10, meta[0]['transform'][5]+area[1]*-10    
         return x, y
+    
+    def mosaic_files(qs):
+        src_files_to_mosaic = []
+        for fp in qs:
+            src = rio.open(fp)
+            src_files_to_mosaic.append(src)
+        mosaic, out_trans = merge(src_files_to_mosaic)
+        #show(mosaic, cmap='terrain')
+        route = qs[0].split("\\")[0]
+        name = qs[0].split("\\")[-1].split(".")[0]
+        name1 = name.split("_")[0][:3]+"_"+name.split("_")[1]+"_"+name.split("_")[2]
+        # Copy the metadata
+        out_meta = src.meta.copy()
+        # Update the metadata
+        out_meta.update({"driver": "GTiff",
+                         "height": mosaic.shape[1],
+                         "width": mosaic.shape[2],
+                         "transform": out_trans,
+                         "crs": "+proj=utm +zone=35 +ellps=GRS80 +units=m +no_defs "
+                         }
+                        ) 
+        # Write the mosaic raster to disk
+        with rio.open(route+"/mosaic/"+name1+".tif", "w", **out_meta) as dest:
+            dest.write(mosaic)
+            dest.close()
+        return route, name1

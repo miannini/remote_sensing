@@ -232,5 +232,8 @@ class Satellite_tools:
         ndvi_plt.close()
         
     def trns_coor(area,meta):
-        x, y = meta['transform'][2]+area[0]*10, meta['transform'][5]+area[1]*-10
+        try:
+            x, y = meta['transform'][2]+area[0]*10, meta['transform'][5]+area[1]*-10
+        except:
+            x, y = meta[0]['transform'][2]+area[0]*10, meta[0]['transform'][5]+area[1]*-10    
         return x, y

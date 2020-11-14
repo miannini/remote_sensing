@@ -11,7 +11,7 @@
 # declarando solo user
 # python satellite_image_script_v3.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E --download no
 #analisis de imagenes locales
-# python satellite_image_script_v5_locals.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIAbLizOODQRp_OCDFX --date_ini 2020-01-05 --date_fin 2020-01-30 --local local
+# python satellite_image_script_v5.py --date_ini 2019-10-01 --date_fin 2020-10-20 --download yes --erase yes
 
 ## leer librerias
 import numpy as np
@@ -29,6 +29,7 @@ import matplotlib.pyplot as plt
 import cv2
 import shutil
 import time
+import glob
 from myfunctions import Fire_down
 from myfunctions import Cloud_finder
 from myfunctions import Sentinel_downloader
@@ -38,6 +39,7 @@ from myfunctions.temp_stats import Stats_charts
 from myfunctions import Upload_fire
 from myfunctions import Ext_shape
 import argparse
+
 
 ## variables dinamicas para correr en terminal unicamente
 ap = argparse.ArgumentParser()
@@ -62,8 +64,8 @@ args = vars(ap.parse_args())
 #inicializacion de variables - fechas
 Date_Ini = (args["date_ini"]) 
 Date_Fin = (args["date_fin"]) 
-#Date_Ini='2019-10-01'
-#Date_Fin='2020-10-20'
+#Date_Ini='2020-02-01'
+#Date_Fin='2020-02-10'
 
 #inicializacion de variables - user / area
 user_analysis = (args["user"])
@@ -152,7 +154,7 @@ Path(clouds_folder+analysis_area).mkdir(parents=True, exist_ok=True)
 #cloud detection
 #check if local clouds will be used
 local_files = (args["local"]) 
-#local_files = 'local' 'no' #'cloud' 
+#local_files = 'no' 'local' 'no' #'cloud' 
 if local_files =='no':  
     start = time.time()          
     best_date, valid_dates, clouds_data, clear_pct, number_cld_analysis = Cloud_finder.cloud_process(bounding_box, Date_Ini, Date_Fin, x_width_cloud, y_height_cloud,analysis_area,clouds_folder,lote_aoi,municipio, departamento)
@@ -168,28 +170,34 @@ Path(zipped_folder).mkdir(parents=True, exist_ok=True)
 Path(unzipped_folder+analysis_area).mkdir(parents=True, exist_ok=True)
 
 down_yes = (args["download"])
-#down_yes = 'no' 'yes' 'no' 'yes'
+#down_yes =  'no' 'yes'
 if down_yes == 'yes':
     #Join area of multiple AOI, to download when partial satellite image contains the small AOI
     lotes_uni = lote_aoi_loc.to_crs(4326) 
     lotes_uni = lotes_uni['geometry'].unary_union 
-    Sentinel_downloader.image_down(footprint, Date_Ini, Date_Fin, valid_dates, analysis_area,zipped_folder,unzipped_folder,lotes_uni)
+    products_df = Sentinel_downloader.image_down(footprint, Date_Ini, Date_Fin, valid_dates, analysis_area,zipped_folder,unzipped_folder,lotes_uni,user_analysis,municipio, departamento)
+else:
+    products_df = pd.read_csv('../Data/Database/DB_downloaded_files.csv')
+    products_df = products_df[products_df['terrain']== analysis_area]
+    products_df['date'] = products_df['date'].astype(str)
 direcciones = Sentinel_downloader.get_routes(analysis_area,unzipped_folder)
 print(direcciones)
 
 #release some memory
-del(lote_aoi,minx,maxx,miny,maxy,bounding_box,aoi_universal,footprint)
+#del(lote_aoi,minx,maxx,miny,maxy,bounding_box,aoi_universal,footprint)
 
 #crop satellite images
 output_folder='../Data/Output_Images/'
 Path(output_folder+analysis_area).mkdir(parents=True, exist_ok=True)
 start = time.time() 
 big_proto = []
+dates_ready = []
 resumen_bandas = pd.DataFrame()
 table_bandas = pd.DataFrame()
 if local_files =='no': 
     R10=''
     date=''
+    
     for dire in direcciones:
         R10=dire+'/'
         date= R10.split("_")[-2][:8]
@@ -198,19 +206,53 @@ if local_files =='no':
         ind_mask = []
         date_obj = datetime.datetime.strptime(date, '%Y%m%d')
         print("[INFO] Date to Analyze = {}".format(date))
+        if date in dates_ready: 
+            print("omit date due mosaic")
+            continue
         for i in range(0,len(valid_dates)):
             date_msk = valid_dates.iloc[i,0].date()    
             if date_obj.date() == date_msk:
                 ind_mask.append(i)
         #list bands
         onlyfiles = [f for f in listdir(R10) if isfile(join(R10, f))]
-        #crop bands
-        for ba in onlyfiles:
-            if 'TCI' not in ba:          
-                skip = Satellite_proc.crop_sat(R10,ba,aoi,analysis_area,output_folder,x_width)
-        if skip == True:
-            print("[INFO] fecha {}, zona {} recortada ... skip".format(date,zone))
-            continue
+        #review if date is in products_df and is contained
+        tile_date = products_df[products_df['date'] == date]
+        if (tile_date[tile_date["mode"] == 'contained_footprint'].size == 0):
+            #activate alteranive tiles mosaic
+            print("zona requiere 2 areas unidas para analisis")
+            list_files_same_date=[]
+            for dires2 in direcciones:
+                file_name = dires2.split("\\")[-4].split(".")[0]
+                for tiles in tile_date.title:
+                    if file_name == tiles:
+                        list_files_same_date.append(dires2)
+            list_extensions = ['*B01.JP2', '*B02.JP2','*B03.JP2','*B04.JP2','*B05.JP2','*B06.JP2','*B07.JP2','*B08.JP2','*B8A.JP2','*B09.JP2','*B10.JP2','*B11.JP2','*B12.JP2']
+            #get files and dirpath based on extensions
+            for search_criteria in list_extensions:
+                qs=[]
+                for dirpath in list_files_same_date:
+                    q = os.path.join(dirpath, search_criteria)
+                    dem_fps = glob.glob(q)
+                    qs = qs + dem_fps
+            
+                #mosaic files
+                Path(unzipped_folder+analysis_area+"mosaic/").mkdir(parents=True, exist_ok=True)
+                route, name1 = Satellite_proc.mosaic_files(qs)
+            dates_ready.append(date)
+            #list bands
+            onlyfiles = [f for f in listdir(unzipped_folder+analysis_area+"/mosaic/") if isfile(join(unzipped_folder+analysis_area+"/mosaic/", f))]
+            #crop bands
+            for ba in onlyfiles:
+                if 'TCI' not in ba:          
+                    skip = Satellite_proc.crop_sat(unzipped_folder+analysis_area+"/mosaic/",ba,aoi,analysis_area,output_folder,x_width)
+        else:
+            #crop bands
+            for ba in onlyfiles:
+                if 'TCI' not in ba:          
+                    skip = Satellite_proc.crop_sat(R10,ba,aoi,analysis_area,output_folder,x_width)
+            if skip == True:
+                print("[INFO] fecha {}, zona {} recortada ... skip".format(date,zone))
+                continue
         #cloud mask
         x_width_band, y_height_band = Satellite_proc.cld_msk(date, clouds_data, ind_mask, analysis_area,output_folder)
         
@@ -275,8 +317,8 @@ elif local_files == 'local':
 #else: #'cloud'
 end = time.time()
 print(end - start)   
-
-best_date = count_of_clouds.loc[count_of_clouds.groupby('date')['clear_pxl_count'].idxmax()].date[0]
+if 'best_date' not in locals():
+    best_date = count_of_clouds.loc[count_of_clouds.groupby('date')['clear_pxl_count'].idxmax()].date[0]
 
 #exportar datos CSV
 if folder_name != "no":
