@@ -312,20 +312,26 @@ class Satellite_proc:
             x, y = meta[0]['transform'][2]+area[0]*10, meta[0]['transform'][5]+area[1]*-10    
         return x, y
     
-    def mosaic_files(qs):
+    def mosaic_files(unzipped_folder,analysis_area,qs):
         src_files_to_mosaic = []
         for fp in qs:
             src = rio.open(fp)
             src_files_to_mosaic.append(src)
         mosaic, out_trans = merge(src_files_to_mosaic)
         #show(mosaic, cmap='terrain')
-        route = qs[0].split("\\")[0]
-        name = qs[0].split("\\")[-1].split(".")[0]
+        try:
+            route = qs[0].split("/")[0]
+            name = qs[0].split("/")[-1].split(".")[0]  
+            folder_safe = qs[0].split("/")[-5] 
+        except:
+            route = qs[0].split("\\")[0]
+            name = qs[0].split("\\")[-1].split(".")[0]
+            folder_safe = qs[0].split("\\")[-5]
         name1 = name.split("_")[0][:3]+"_"+name.split("_")[1]+"_"+name.split("_")[2]
         # Copy the metadata
         out_meta = src.meta.copy()
         # Update the metadata
-        out_meta.update({"driver": "GTiff",
+        out_meta.update({"driver": "GTiff", #"JP2ECW", 
                          "height": mosaic.shape[1],
                          "width": mosaic.shape[2],
                          "transform": out_trans,
@@ -333,7 +339,8 @@ class Satellite_proc:
                          }
                         ) 
         # Write the mosaic raster to disk
-        with rio.open(route+"/mosaic/"+name1+".tif", "w", **out_meta) as dest:
+        with rio.open(unzipped_folder+analysis_area+"/mosaic/"+name1+".tif", "w", **out_meta) as dest: #".jp2" ".tif"
             dest.write(mosaic)
             dest.close()
-        return route, name1
+        src.close()
+        return route, name1, folder_safe

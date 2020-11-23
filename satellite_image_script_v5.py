@@ -112,7 +112,7 @@ deptos.crs = {'init':'epsg:21897', 'no_defs': True} #crs 21897 determinado usand
 deptos = deptos.to_crs(4326)
 departamento = deptos[deptos['geometry'].contains(footprint)]
 '''
-mpos = gpd.read_file(shape_folder+'/Colombia/mpos/MGN_MPIO_POLITICO.shp')
+mpos = gpd.read_file('myfunctions/Colombia/mpos/MGN_MPIO_POLITICO.shp')
 mpos.crs = {'init':'epsg:4326', 'no_defs': True}
 mpos = gpd.overlay(mpos, lote_aoi, how='intersection')
 municipio, departamento = mpos.loc[0,'MPIO_CNMBR'], mpos.loc[0,'DPTO_CNMBR']
@@ -170,7 +170,7 @@ Path(zipped_folder).mkdir(parents=True, exist_ok=True)
 Path(unzipped_folder+analysis_area).mkdir(parents=True, exist_ok=True)
 
 down_yes = (args["download"])
-#down_yes =  'no' 'yes'
+#down_yes =  'yes' 'no' 'yes'
 if down_yes == 'yes':
     #Join area of multiple AOI, to download when partial satellite image contains the small AOI
     lotes_uni = lote_aoi_loc.to_crs(4326) 
@@ -208,6 +208,12 @@ if local_files =='no':
         print("[INFO] Date to Analyze = {}".format(date))
         if date in dates_ready: 
             print("omit date due mosaic")
+            #delete safe folder
+            try:
+                file_name = dire.split("/")[-4]
+            except:
+                file_name = dire.split("\\")[-4]
+            shutil.rmtree(unzipped_folder+analysis_area+"/"+file_name+"/", ignore_errors=True)
             continue
         for i in range(0,len(valid_dates)):
             date_msk = valid_dates.iloc[i,0].date()    
@@ -222,23 +228,32 @@ if local_files =='no':
             print("zona requiere 2 areas unidas para analisis")
             list_files_same_date=[]
             for dires2 in direcciones:
-                file_name = dires2.split("\\")[-4].split(".")[0]
+                try:
+                    file_name = dires2.split("/")[-4].split(".")[0]
+                except:
+                    file_name = dires2.split("\\")[-4].split(".")[0]
                 for tiles in tile_date.title:
                     if file_name == tiles:
                         list_files_same_date.append(dires2)
-            list_extensions = ['*B01.JP2', '*B02.JP2','*B03.JP2','*B04.JP2','*B05.JP2','*B06.JP2','*B07.JP2','*B08.JP2','*B8A.JP2','*B09.JP2','*B10.JP2','*B11.JP2','*B12.JP2']
+            #print(list_files_same_date)
+            list_extensions = ['*B01.jp2', '*B02.jp2','*B03.jp2','*B04.jp2','*B05.jp2','*B06.jp2','*B07.jp2','*B08.jp2','*B8A.jp2','*B09.jp2','*B10.jp2','*B11.jp2','*B12.jp2']
             #get files and dirpath based on extensions
             for search_criteria in list_extensions:
                 qs=[]
                 for dirpath in list_files_same_date:
                     q = os.path.join(dirpath, search_criteria)
-                    dem_fps = glob.glob(q)
+                    dem_fps = glob.glob(q, recursive=True)
                     qs = qs + dem_fps
-            
+                #print(qs,dem_fps)
+                
                 #mosaic files
-                Path(unzipped_folder+analysis_area+"mosaic/").mkdir(parents=True, exist_ok=True)
-                route, name1 = Satellite_proc.mosaic_files(qs)
+                Path(unzipped_folder+analysis_area+"/mosaic/").mkdir(parents=True, exist_ok=True)
+                route, name1, folder_safe = Satellite_proc.mosaic_files(unzipped_folder,analysis_area,qs)
             dates_ready.append(date)
+            #delete original folder
+            shutil.rmtree(unzipped_folder+analysis_area+"/"+folder_safe+"/", ignore_errors=True)
+            print("[INFO] .SAFE folder unzipped erased")
+            
             #list bands
             onlyfiles = [f for f in listdir(unzipped_folder+analysis_area+"/mosaic/") if isfile(join(unzipped_folder+analysis_area+"/mosaic/", f))]
             #crop bands
@@ -276,7 +291,7 @@ if local_files =='no':
     #processed_data = pd.read_csv (r'../Data/Database/DB_datos_proecsados.csv', index_col=0)   
     processed_df = pd.DataFrame(data={'user' : [user_analysis.split("/")[0]], 'terrain':[analysis_area], 'municipio':[municipio] , 'departamento':[departamento] ,'initial_date' : [Date_Ini] ,'final_date' : [Date_Fin], 'last_valid_date' : [max(valid_dates[0])], 'number_valid_date' : [len(valid_dates[0])], 'number_analyzed_images': [number_cld_analysis] , 'processed_date' : [datetime.date.today()]})    
     processed_df.to_csv (r'../Data/Database/DB_datos_proecsados.csv', index = True, header=False, mode='a')
-        
+    shutil.rmtree(unzipped_folder+analysis_area+"/mosaic/", ignore_errors=True)    
     #local files
 elif local_files == 'local':
     bands = ["B01.tif","B02.tif","B03.tif","B04.tif","B05.tif","B06.tif","B07.tif","B08.tif","B09.tif","B10.tif","B11.tif","B12.tif","B8A.tif","_cldmsk.tif"]
