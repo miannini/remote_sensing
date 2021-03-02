@@ -64,8 +64,8 @@ args = vars(ap.parse_args())
 #inicializacion de variables - fechas
 Date_Ini = (args["date_ini"]) 
 Date_Fin = (args["date_fin"]) 
-#Date_Ini='2020-02-01'
-#Date_Fin='2020-02-10'
+#Date_Ini= '2020-11-26'#'2020-09-11'
+#Date_Fin= '2020-12-05'#'2021-02-02'
 
 #inicializacion de variables - user / area
 user_analysis = (args["user"])
@@ -123,9 +123,9 @@ Path(database_folder+analysis_area).mkdir(parents=True, exist_ok=True)
     
 #leer shapefiles externos si es requerido
 folder_name = (args["shape"])
-#folder_name = 'no' 'external_shape' #'no'
+#folder_name = 'external_shape' #'no'
 keep_own = (args["own"]) 
-#keep_own = 'yes' 'no' #'yes' 
+#keep_own = 'no' 'yes' 'no' #'yes' 
 if folder_name != "no":
     todos_lotes, todos_lotes_loc = Ext_shape.merge_shapes(shape_folder,lote_aoi,lote_aoi_loc,folder_name,analysis_area)
     #si se definio external shapefiles, aoig_near contendra la misma info
@@ -176,10 +176,14 @@ if down_yes == 'yes':
     lotes_uni = lote_aoi_loc.to_crs(4326) 
     lotes_uni = lotes_uni['geometry'].unary_union 
     products_df = Sentinel_downloader.image_down(footprint, Date_Ini, Date_Fin, valid_dates, analysis_area,zipped_folder,unzipped_folder,lotes_uni,user_analysis,municipio, departamento)
+    products_df['date'] = products_df['date'].astype(str)#.replace("-","")
+    products_df['date'] = products_df['date'].str.split(' ').str[0].str.replace("-","")
+    #products2 = products_df['date'].str.split(' ').str[0]
 else:
     products_df = pd.read_csv('../Data/Database/DB_downloaded_files.csv')
     products_df = products_df[products_df['terrain']== analysis_area]
     products_df['date'] = products_df['date'].astype(str)
+    products_df['date'] = products_df['date'].str.split(' ').str[0].str.replace("-","")
 direcciones = Sentinel_downloader.get_routes(analysis_area,unzipped_folder)
 print(direcciones)
 
@@ -197,14 +201,16 @@ table_bandas = pd.DataFrame()
 if local_files =='no': 
     R10=''
     date=''
-    
+    hora=''
     for dire in direcciones:
         R10=dire+'/'
         date= R10.split("_")[-2][:8]
+        hora=R10.split("_")[-2][9:15]
         zone= R10.split("_")[-4][:]
         #find cloud mask date file    
         ind_mask = []
-        date_obj = datetime.datetime.strptime(date, '%Y%m%d')
+        datelong = date+" " +hora
+        date_obj = datetime.datetime.strptime(datelong, '%Y%m%d %H%M%S')
         print("[INFO] Date to Analyze = {}".format(date))
         if date in dates_ready: 
             print("omit date due mosaic")
@@ -216,12 +222,15 @@ if local_files =='no':
             shutil.rmtree(unzipped_folder+analysis_area+"/"+file_name+"/", ignore_errors=True)
             continue
         for i in range(0,len(valid_dates)):
-            date_msk = valid_dates.iloc[i,0].date()    
-            if date_obj.date() == date_msk:
+            #date_msk = valid_dates.iloc[i,0].date() 
+            date_msk_1 = datetime.datetime.strptime(valid_dates[i][0], '%Y-%m-%d') #str(valid_dates.iloc[c,0]).split()[0]
+            date_msk_2 = datetime.datetime.strptime(valid_dates[i][1], '%Y-%m-%d')
+            if (date_obj >= date_msk_1 and date_obj <= date_msk_2):
                 ind_mask.append(i)
         #list bands
         onlyfiles = [f for f in listdir(R10) if isfile(join(R10, f))]
         #review if date is in products_df and is contained
+        
         tile_date = products_df[products_df['date'] == date]
         if (tile_date[tile_date["mode"] == 'contained_footprint'].size == 0):
             #activate alteranive tiles mosaic
@@ -289,7 +298,7 @@ if local_files =='no':
         print("[INFO] Date, zone Analyzed = {} - {}".format(date,zone))
     #write log to DB at end of process
     #processed_data = pd.read_csv (r'../Data/Database/DB_datos_proecsados.csv', index_col=0)   
-    processed_df = pd.DataFrame(data={'user' : [user_analysis.split("/")[0]], 'terrain':[analysis_area], 'municipio':[municipio] , 'departamento':[departamento] ,'initial_date' : [Date_Ini] ,'final_date' : [Date_Fin], 'last_valid_date' : [max(valid_dates[0])], 'number_valid_date' : [len(valid_dates[0])], 'number_analyzed_images': [number_cld_analysis] , 'processed_date' : [datetime.date.today()]})    
+    processed_df = pd.DataFrame(data={'user' : [user_analysis.split("/")[0]], 'terrain':[analysis_area], 'municipio':[municipio] , 'departamento':[departamento] ,'initial_date' : [Date_Ini] ,'final_date' : [Date_Fin], 'last_valid_date' : [valid_dates[-1][0]], 'number_valid_date' : [len(valid_dates)], 'number_analyzed_images': [number_cld_analysis] , 'processed_date' : [datetime.date.today()]})    
     processed_df.to_csv (r'../Data/Database/DB_datos_proecsados.csv', index = True, header=False, mode='a')
     shutil.rmtree(unzipped_folder+analysis_area+"/mosaic/", ignore_errors=True)    
     #local files
@@ -343,8 +352,8 @@ if folder_name != "no":
     #Biomass corrected value
     #mean_value._BM, sum_value._BM, area, count_pxl._cldmsk, sum_value._cldmsk
     flattened['cld_percentage']=flattened["sum_value._cldmsk"]/flattened["count_pxl._cldmsk"]
-    flattened['area_factor']= (flattened["count_pxl._BM"]/flattened["count_pxl._cldmsk"])*((100*flattened["count_pxl._BM"])/flattened["area"]) #mayor a 1 se debe reducir, menor a 1 se debe sumar
-    flattened['biomass_corrected'] = flattened["mean_value._BM"]*(flattened["area"]/(100*100))
+    flattened['area_factor']= (flattened["count_pxl._bm"]/flattened["count_pxl._cldmsk"])*((100*flattened["count_pxl._bm"])/flattened["area"]) #mayor a 1 se debe reducir, menor a 1 se debe sumar
+    flattened['biomass_corrected'] = flattened["mean_value._bm"]*(flattened["area"]/(100*100))
     flattened.to_csv (r'../Data/Database/'+analysis_area+'/resumen_lotes_medidas.csv', index = True, header=True)
     resumen_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_vertical_lotes_medidas.csv', index = True, header=True)
     print("[INFO] data table exported as CSV")
@@ -474,7 +483,7 @@ print("[INFO] images uploaded to Firebase")
 
 #delete downloaded unzipped images
 erase_yes = (args["erase"])
-#erase_yes='no'
+#erase_yes= 'no'
 if erase_yes == 'yes':
     shutil.rmtree(unzipped_folder, ignore_errors=True)
     print("[INFO] unzipped images erased")

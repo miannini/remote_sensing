@@ -18,7 +18,7 @@ class Cloudless_tools:
             plt.imshow(rgb * factor)
             if mask is not None:
                 cloud_image = np.zeros((mask.shape[0], mask.shape[1], 4), dtype=np.uint8)
-                cloud_image[mask == 1] = np.asarray([255, 255, 0, 100], dtype=np.uint8)
+                cloud_image[mask == 255] = np.asarray([255, 255, 0, 100], dtype=np.uint8)
                 plt.imshow(cloud_image)
                 
         def plot_probability_map(rgb_image, prob_map, factor=1./255, figsize=(15, 30)):

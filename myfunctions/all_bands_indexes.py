@@ -80,12 +80,16 @@ class Satellite_proc:
         #cloud mask generate file
         #src = output_folder+analysis_area+'/'+"CLOUD_BASE.tif"
         src = output_folder+analysis_area+'/'+date[:8]+"B04.tif"
-        data = clouds_data[ind_mask]
+        data = clouds_data[:,:,ind_mask]
+        data = data[:,:,0]
         scale = x_width/len(data[0])
-        data = data[0]
+        #data = data[0]
         data_interpolated = interpolation.zoom(data,scale)
-        gdal_array.LoadFile(src) 
-        gdal_array.SaveArray(data_interpolated, output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif", format="GTiff", prototype=src)
+        data_interpolated = np.expand_dims(data_interpolated, axis=0)
+        save = gdal_array.LoadFile(src) 
+        save = gdal_array.SaveArray(data_interpolated, output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif", format="GTiff", prototype=src)
+        save = gdal_array.SaveArray(data_interpolated, output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif", format="GTiff", prototype=src)
+        save = None
         return x_width, y_height
     
     
@@ -194,7 +198,7 @@ class Satellite_proc:
         
         #corrections based on clouds
         def remove_clouds(index):
-            index[cld==1] = None
+            index[cld>=200] = None #>1
         for ind in indexes:
             remove_clouds(ind)
             

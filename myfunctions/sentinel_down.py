@@ -33,40 +33,42 @@ class Sentinel_downloader:
         max_inter = max(products_gdf_sorted['intersec'])
 
         #order to omit duplicated dates, sorted by date and intersection area
-        products_gdf_sorted = products_gdf_sorted.sort_values(['beginposition','contains','intersec'], ascending=[True,True,False])
+        products_gdf_sorted = products_gdf_sorted.sort_values(['beginposition','contains','intersec'], ascending=[True,False,False])
         #Leer el listado de imagenes por fechas en las que el porcentaje de nubes calculado sea menor al valor indicado
         file_list = []
         intersec_dates = [] #store analyzed dates
         contained_dates = []
         products_df = pd.DataFrame()
         for b in range(0,len(products_gdf_sorted)):
-            api_id = str(products_gdf_sorted.iloc[b,7]).split()[0]
-            for c in range(0,len(valid_dates)):
-                valid_dates_id = str(valid_dates.iloc[c,0]).split()[0]
+            api_id = str(products_gdf_sorted.iloc[b,7]).split(".")[0]
+            api_id = datetime.datetime.strptime(api_id, '%Y-%m-%d %H:%M:%S')
+            for c in range(0,len(valid_dates)): 
+                valid_dates_id_1 = datetime.datetime.strptime(valid_dates[c][0], '%Y-%m-%d') #str(valid_dates.iloc[c,0]).split()[0]
+                valid_dates_id_2 = datetime.datetime.strptime(valid_dates[c][1], '%Y-%m-%d') 
                 #date of sentinel file and date of clouds valid are equal / and / intersection area of tile is near maximum
                 #if(api_id==valid_dates_id and products_gdf_sorted['geometry'][b].contains(footprint)):
-                if(api_id==valid_dates_id and (valid_dates_id not in contained_dates)): 
+                if(api_id>=valid_dates_id_1 and api_id<=valid_dates_id_2 and (valid_dates_id_1 not in contained_dates)): 
                     if(products_gdf_sorted['contains'][b] == True):
                         file = products_gdf_sorted['uuid'][b]
                         title = products_gdf_sorted['title'][b]
                         file_list.append(file)
                         #ready_dates.append(valid_dates_id)
-                        contained_dates.append(valid_dates_id)
+                        contained_dates.append(valid_dates_id_1)
                         print(file,title,'contained')
                         if products_df.empty:
-                            products_df = pd.DataFrame(data={'user' : [user_analysis.split("/")[0]], 'terrain':[analysis_area], 'title':[title], 'file':[file], 'municipio':[municipio] , 'departamento':[departamento] ,'date' : [valid_dates_id.replace("-","")] ,'mode' : "contained_footprint", 'processed_date' : [datetime.date.today()]})    
+                            products_df = pd.DataFrame(data={'user' : [user_analysis.split("/")[0]], 'terrain':[analysis_area], 'title':[title], 'file':[file], 'municipio':[municipio] , 'departamento':[departamento] ,'date' : [api_id] ,'mode' : "contained_footprint", 'processed_date' : [datetime.date.today()]})     #.replace("-","")
                         else:
-                            products_df = products_df.append(pd.DataFrame(data={'user' : [user_analysis.split("/")[0]], 'terrain':[analysis_area], 'title':[title], 'file':[file], 'municipio':[municipio] , 'departamento':[departamento] ,'date' : [valid_dates_id.replace("-","")] ,'mode' : "contained_footprint", 'processed_date' : [datetime.date.today()]}))
+                            products_df = products_df.append(pd.DataFrame(data={'user' : [user_analysis.split("/")[0]], 'terrain':[analysis_area], 'title':[title], 'file':[file], 'municipio':[municipio] , 'departamento':[departamento] ,'date' : [api_id] ,'mode' : "contained_footprint", 'processed_date' : [datetime.date.today()]})) #.replace("-","")
                     elif(products_gdf_sorted['geometry'][b].contains(lotes_uni) and products_gdf_sorted['intersec'][b] >= max_inter - max_inter*0.3):
                         file = products_gdf_sorted['uuid'][b]
                         title = products_gdf_sorted['title'][b]
                         file_list.append(file)
-                        intersec_dates.append(valid_dates_id)
+                        intersec_dates.append(valid_dates_id_1)
                         print(file,title,'intersected')
                         if products_df.empty:
-                            products_df = pd.DataFrame(data={'user' : [user_analysis.split("/")[0]], 'terrain':[analysis_area], 'title':[title], 'file':[file], 'municipio':[municipio] , 'departamento':[departamento] ,'date' : [valid_dates_id.replace("-","")] ,'mode' : "intersected", 'processed_date' : [datetime.date.today()]})    
+                            products_df = pd.DataFrame(data={'user' : [user_analysis.split("/")[0]], 'terrain':[analysis_area], 'title':[title], 'file':[file], 'municipio':[municipio] , 'departamento':[departamento] ,'date' : [api_id] ,'mode' : "intersected", 'processed_date' : [datetime.date.today()]})    #.replace("-","")
                         else:
-                            products_df = products_df.append(pd.DataFrame(data={'user' : [user_analysis.split("/")[0]], 'terrain':[analysis_area], 'title':[title], 'file':[file], 'municipio':[municipio] , 'departamento':[departamento] ,'date' : [valid_dates_id.replace("-","")] ,'mode' : "intersected", 'processed_date' : [datetime.date.today()]}))
+                            products_df = products_df.append(pd.DataFrame(data={'user' : [user_analysis.split("/")[0]], 'terrain':[analysis_area], 'title':[title], 'file':[file], 'municipio':[municipio] , 'departamento':[departamento] ,'date' : [api_id] ,'mode' : "intersected", 'processed_date' : [datetime.date.today()]})) #.replace("-","")
                         
         #unique files // remove because of duplicated dates in clouds analysis
         file_list = list(dict.fromkeys(file_list))
