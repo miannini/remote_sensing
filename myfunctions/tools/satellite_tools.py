@@ -8,14 +8,35 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.ndimage import interpolation
+#from myfunctions.tools import MidpointNormalize
 import cv2
 #import math
 #from rasterio.mask import mask
 #Define custom fucntions to compare bands
 #more complex than rest
 
+import matplotlib.colors as colors
+
+
+
+class MidpointNormalize(colors.Normalize):
+	"""
+	Normalise the colorbar so that diverging bars work there way either side from a prescribed midpoint value)
+
+	e.g. im=ax1.imshow(array, norm=MidpointNormalize(midpoint=0.,vmin=-100, vmax=100))
+	"""
+	def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
+		self.midpoint = midpoint
+		colors.Normalize.__init__(self, vmin, vmax, clip)
+
+	def __call__(self, value, clip=None):
+		# I'm ignoring masked values and all kinds of edge cases to make a
+		# simple example...
+		x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+		return np.ma.masked_array(np.interp(value, x, y), np.isnan(value))
+
 class Satellite_tools:
-    def crop_sat(folder, name, aoi, analysis_area,output_folder, x_width):
+    '''def crop_sat(folder, name, aoi, analysis_area,output_folder, x_width):
         #R10,ba,aoi,analysis_area,output_folder
         with rio.open(folder+name) as src:
             out_image, out_transform = rio.mask.mask(src, aoi.geometry,crop=True)
@@ -150,15 +171,15 @@ class Satellite_tools:
             img = img[abs(dif_dims):,:]
         #for bands with resolution less than 10m, reshape band to scale size       
         if x_width > b1.width:
-            '''
-            img = cv2.imread(output_folder+analysis_area+'/'+date[:8]+band1+".tif",-1)
-            dif_dims = img.shape[0] - img.shape[1]
-            if dif_dims < 0 :
-                img = img[:,abs(dif_dims):]
-            elif dif_dims > 0 :
-                img = img[abs(dif_dims):,:]
-            scale_percent = x_width/b1.width # percent of original size
-            '''
+            #commented
+            #img = cv2.imread(output_folder+analysis_area+'/'+date[:8]+band1+".tif",-1)
+            #dif_dims = img.shape[0] - img.shape[1]
+            #if dif_dims < 0 :
+            #    img = img[:,abs(dif_dims):]
+            #elif dif_dims > 0 :
+            #    img = img[abs(dif_dims):,:]
+            #scale_percent = x_width/b1.width # percent of original size
+            
             scale_percent = x_width/img.shape[1]
             width = int(img.shape[1] * scale_percent)
             height = int(img.shape[0] * scale_percent)
@@ -174,16 +195,15 @@ class Satellite_tools:
         elif dif_dims2 > 0 :
             img2 = img2[abs(dif_dims2):,:]
         if x_width > b2.width:
-            '''
-            img = cv2.imread(output_folder+analysis_area+'/'+date[:8]+band2+".tif",-1)
-            dif_dims = img.shape[0] - img.shape[1]
-            if dif_dims < 0 :
-                img = img[:,abs(dif_dims):]
-            elif dif_dims > 0 :
-                img = img[abs(dif_dims):,:]
-            scale_percent = x_width/b2.width # percent of original size
-            '''
-            scale_percent2 = x_width/img2.shape[1]
+            #commented
+            #img = cv2.imread(output_folder+analysis_area+'/'+date[:8]+band2+".tif",-1)
+            #dif_dims = img.shape[0] - img.shape[1]
+            #if dif_dims < 0 :
+            #    img = img[:,abs(dif_dims):]
+            #elif dif_dims > 0 :
+            #    img = img[abs(dif_dims):,:]
+            #scale_percent = x_width/b2.width # percent of original size
+                        scale_percent2 = x_width/img2.shape[1]
             width2 = int(img2.shape[1] * scale_percent2)
             height2 = int(img2.shape[0] * scale_percent2)
             dim2 = (width2, height2)
@@ -230,10 +250,47 @@ class Satellite_tools:
         plt.savefig(output_folder+analysis_area+'/'+date[:8]+destination,bbox_inches='tight',dpi=500)
         plt.clf()
         ndvi_plt.close()
-        
+    '''    
     def trns_coor(area,meta):
         try:
             x, y = meta['transform'][2]+area[0]*10, meta['transform'][5]+area[1]*-10
         except:
             x, y = meta[0]['transform'][2]+area[0]*10, meta[0]['transform'][5]+area[1]*-10    
         return x, y
+    
+    def plot_figura2(image, analysis_area, date, output_folder,lote_name,index_str, cmap, **kwargs): #, vmin=-1, vmax=1
+            ext=False
+            cen = False
+            for key,value in kwargs.items():
+                if key == 'vmin':
+                    vmin1=value
+                    ext=True
+                elif key == 'vmax':
+                    vmax1=value
+                    ext=True
+                elif key == 'vcen':
+                    vcen1=value
+                    ext=True
+                    cen = True
+                        
+            fig = plt.figure(figsize=(3,3))
+            #area chart
+            ax = plt.gca()
+            #remove 0 to None
+            image[image==0] = None
+            if cen == True:
+                im = ax.imshow(image[0], cmap=cmap, clim=(vmin1, vmax1), norm=MidpointNormalize(midpoint=vcen1,vmin=vmin1, vmax=vmax1))
+            elif ext==True:
+                im = ax.imshow(image[0], cmap=cmap, vmin=vmin1, vmax=vmax1)
+            else:
+                im = ax.imshow(image[0], cmap=cmap, vmin=np.nanpercentile(image,1), vmax=np.nanpercentile(image,99)) #'RdYlGn'
+            #plot
+            plt.title(index_str+' in ' + lote_name)
+            plt.xlabel('Latitude')
+            plt.ylabel('Longitude')
+            #to locate colorbar
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(im, cax=cax)
+            plt.savefig(output_folder+analysis_area+'/'+date[:8]+"_"+lote_name+"_"+index_str+".png",bbox_inches='tight',dpi=100)
+            plt.clf()

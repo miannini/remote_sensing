@@ -13,7 +13,9 @@ from scipy.ndimage import interpolation
 import cv2
 from varname import nameof, Wrapper, varname
 import inspect
+from sklearn.preprocessing import MinMaxScaler, RobustScaler
 from myfunctions.tools import MidpointNormalize
+from myfunctions.tools import Satellite_tools
 #Define custom fucntions to compare bands
 #more complex than rest
 
@@ -60,7 +62,10 @@ class Satellite_proc:
     
     def area_crop(date,aoi2,analysis_area,source, destination, output_folder): #"_NDVI.tif", "_NDVI_lote.tif","Output_Images/" 
         with rio.open(output_folder+analysis_area+'/'+date[:8]+source) as src:
-            out_image, out_transform = rio.mask.mask(src, aoi2.geometry,crop=True)
+            try:
+                out_image, out_transform = rio.mask.mask(src, aoi2.geometry,crop=True)
+            except:
+                out_image, out_transform = rio.mask.mask(src, aoi2,crop=True)  
             out_meta = src.meta.copy()
             out_meta.update({"driver": "GTiff",
                          "height": out_image.shape[1],
@@ -70,7 +75,7 @@ class Satellite_proc:
         with rio.open(output_folder+analysis_area+'/'+date[:8]+destination, "w", **out_meta) as dest:
             dest.write(out_image)
             dest.close()
-            
+    '''        
     def cld_msk(date, clouds_data, ind_mask, analysis_area,output_folder):
         #define construction fixed band at 512 pxl and use always same
         base = rio.open(output_folder+analysis_area+'/'+date[:8]+"B04.tif")
@@ -91,10 +96,10 @@ class Satellite_proc:
         save = gdal_array.SaveArray(data_interpolated, output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif", format="GTiff", prototype=src)
         save = None
         return x_width, y_height
-    
+    '''
     
     def band_calc(date, analysis_area,x_width,output_folder): 
-        msk_cloud = rio.open(output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif")       
+        #msk_cloud = rio.open(output_folder+analysis_area+'/'+date[:8]+"_cldmsk.tif")       
         b1 = rio.open(output_folder+analysis_area+'/'+date[:8]+"B01.tif")
         b2 = rio.open(output_folder+analysis_area+'/'+date[:8]+"B02.tif")
         b3 = rio.open(output_folder+analysis_area+'/'+date[:8]+"B03.tif")
@@ -123,7 +128,7 @@ class Satellite_proc:
         b10r = b10.read()
         b11r = b11.read()
         b12r = b12.read()
-        cld = msk_cloud.read()
+        #cld = msk_cloud.read()
         
         
         
@@ -192,34 +197,40 @@ class Satellite_proc:
         #s2 CP and NDF from paper, b1=560, b2=665, b3=865, b4=2202
         cp = 7.63-54.39*green.astype(float)/10000 + 31.37*red.astype(float)/10000 +21.23*b8ar_c.astype(float)/10000 -25.33*b12r_c.astype(float)/10000 #Crude Protein
         ndf = 54.49+207.53*green.astype(float)/10000 -193.99*red.astype(float)/10000 -54.19*b8ar_c.astype(float)/10000 +111.15*b12r_c.astype(float)/10000 #Neutral Detergent Fiber
-        cld_pxl_count = (np.count_nonzero(cld==0))/(cld[0].shape[0]*cld[0].shape[1])
+        
+        #cld_pxl_count = (np.count_nonzero(cld==0))/(cld[0].shape[0]*cld[0].shape[1])
+        
+        #custom own cloud detection algorithm
+        ndgr = (green.astype(float)-red.astype(float))/(green+red) #normalized difference green/red
+        tao = 0.2
+        cld_custom = np.where( ((b11r_c/10000>tao) & ( ((green/10000>0.175) & (ndgr>0)) | (green/10000>0.39))) , 1, 0)
+        cld_shadow = np.where( (green/10000<0.319) & (b8ar_c/10000<0.166) & (((green-b7r_c/10000<0.027) & (b9r_c-b11r_c/10000>-0.097)) | ((green-b7r_c/10000>0.027) & (b9r_c-b11r_c/10000>0.021))), 1, 0)
+        cld_shadow2 = np.where( (green/10000<0.319) & (b5r_c/b11r_c>4.33) & (green/10000<0.525) & (b1r_c/b5r_c>1.184), 1, 0)                      
+        cld_shd_tot = np.where( (cld_shadow2==1) |(cld_shadow==1) , 1, 0)     
+           
+        #CV para quitar ruido (pequenos puntos) y ampliar bordes para quitar sombras y zona de duda
+        cld2 = cld_custom[0,:,:]
+        cld2 = cld2.astype('uint8')
+        kernel = np.ones((3,3),np.uint8)
+        kernel2 = np.ones((5,5),np.uint8)
+        erosion = cv2.erode(cld2,kernel,iterations = 1)
+        dilation = cv2.dilate(erosion,kernel,iterations = 3)
+        cld_custom = np.expand_dims(dilation, axis=0)
+        
+        cld_all = np.where(cld_shd_tot==1, 2, np.where(cld_custom==1, 1, 0)) #1=cloud, 2=shadow  
+        cld_pxl_count = (np.count_nonzero(cld_custom==0))/(cld_custom[0].shape[0]*cld_custom[0].shape[1])
         
         indexes = [ndvi,ndwi,ccci,ci_g,atsavi,savi,ndmi,gvmi,cvi,dswi,lai,bm,bwdrvi,bri,cp,ndf]
         
         #corrections based on clouds
         def remove_clouds(index):
-            index[cld>=200] = None #>1
+            index[cld_custom>=1] = None #>1
         for ind in indexes:
             remove_clouds(ind)
-            
-        '''
-        ndvi[cld==1] = None
-        ndwi[cld==1] = None
-        ccci[cld==1] = None
-        ci_g[cld==1] = None
-        atsavi[cld==1] = None
-        savi[cld==1] = None
-        ndmi[cld==1] = None
-        gvmi[cld==1] = None
-        cvi[cld==1] = None
-        dswi[cld==1] = None
-        lai[cld==1] = None
-        bm[cld==1] = None
-        bwdrvi[cld==1] = None
-        bri[cld==1] = None
-        cp[cld==1] = None
-        ndf[cld==1] = None
-        '''
+        
+        indexes = [ndvi,ndwi,ccci,ci_g,atsavi,savi,ndmi,gvmi,cvi,dswi,lai,bm,bwdrvi,bri,cp,ndf,cld_custom]
+        #indexes.append(cld_custom) #//no trae el nombre correctamente para TIF
+
         #cp[cp<5] = None
         #ndf[ndf>60] = None
         cp[ndvi<0.35] = None
@@ -247,7 +258,7 @@ class Satellite_proc:
                     ext=True
                     cen = True
                         
-            fig = plt.figure(figsize=(16,16))
+            fig = plt.figure(figsize=(10,10))
             #area chart
             ax = plt.gca()
             if cen == True:
@@ -264,7 +275,7 @@ class Satellite_proc:
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size="5%", pad=0.05)
             plt.colorbar(im, cax=cax)
-            plt.savefig(output_folder+analysis_area+'/'+date[:8]+"_"+str(retrieve_name(index)[0])+".png",bbox_inches='tight',dpi=500)
+            plt.savefig(output_folder+analysis_area+'/'+date[:8]+"_"+str(retrieve_name(index)[0])+".png",bbox_inches='tight',dpi=300)
             plt.clf()
         
         #cmaps = 'RdYlGn', 'RdYlBu','nipy_spectral_r'
@@ -281,8 +292,37 @@ class Satellite_proc:
         plot_figura(bri,'terrain')
         plot_figura(cp,'RdYlGn', vmin=5, vmax=18)
         plot_figura(ndf,'RdYlGn', vmin=30, vmax=60)
+        plot_figura(cld_custom,'gray',vmin=0,vmax=1)
+        plot_figura(cld_all,'copper',vmin=0,vmax=2)
         
-        #eport indexes as tif format
+        #RGB     
+        rgb=np.zeros((green.shape[1],green.shape[2],3))
+        bands = [red, green, blue]
+        for i,b in enumerate(bands):
+            #copy of original RGB bands
+            transformed_band = b.astype(float).copy()
+            transformed_band[cld_custom>=1] = None
+            #stats of bands color without clouds to normalize colors
+            tr_avg = np.nanmean(transformed_band)
+            tr_std= np.nanstd(transformed_band)
+            #scale
+            scaler = MinMaxScaler()
+            x_sample = [tr_avg-2*tr_std, tr_avg+2*tr_std] #rango de AVG +/- STD DEV
+            scaler.fit(np.array(x_sample)[:, np.newaxis]) #ajustado al rango de cada banda
+            #reshape to apply same transformation to all rows and cols of image
+            ascolumns = transformed_band[0,:,:].reshape(-1,1)
+            t = scaler.transform(ascolumns) #fit_
+            transformed = t.reshape(transformed_band.shape)
+            #include again the clouds, but with a mask yellow over it
+            #transformed[cld_custom>=1] = b 
+            #include in big RGB file
+            rgb[...,i] = transformed#_band
+            
+        rgb2 = (rgb.copy()*255).astype('uint8')
+        #Reverse Red-Blue Channels as open cv will reverse again upon writing image on disk
+        cv2.imwrite(output_folder+analysis_area+'/'+date[:8]+"_True_Color.jpg",rgb2[...,::-1])
+        
+        #export indexes as tif format
         meta = b4.meta
         meta.update(driver='GTiff')
         meta.update(dtype=rio.float32)
@@ -296,7 +336,7 @@ class Satellite_proc:
             export_tif(ind)
         
         #Close opened bands
-        bands = [b1,b2,b3,b4,b5,b6,b7,b8,b8a,b9,b10,b11,b12,msk_cloud]
+        bands = [b1,b2,b3,b4,b5,b6,b7,b8,b8a,b9,b10,b11,b12]#msk_cloud
         for ban in bands:
             ban.close()
         
@@ -348,3 +388,29 @@ class Satellite_proc:
             dest.close()
         src.close()
         return route, name1, folder_safe
+    
+    #function to plot indexes by lote
+    def small_area_crop_plot(date,aoig_near,analysis_area, source, output_folder): #aoi2,"_NDVI.tif", "_NDVI_lote.tif","Output_Images/" ,lote_name
+        with rio.open(output_folder+analysis_area+'/'+date[:8]+source+".tif") as src:
+            indexes = ["_ndvi","_atsavi","_lai","_bm","_cp","_ndf"]
+            #incluir aqui el loop para recortar los lotes, evitando I/O por cada lote
+            for n, geo in enumerate (aoig_near.geometry):
+                out_image, out_transform = rio.mask.mask(src, [geo],crop=True)  
+                lote_name = aoig_near['name'][n] 
+                #out_image, out_transform = rio.mask.mask(src, aoi2,crop=True) 
+                if source==indexes[0]: #ndvi
+                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder,lote_name,source,'RdYlGn',vmin=-1,vmax=1)
+                elif source==indexes[1]: #atsavi
+                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder,lote_name,source,'RdYlGn',vmin=0,vmax=1)
+                elif source==indexes[2]: #lai
+                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder,lote_name,source,'nipy_spectral_r',vmin=0,vmax=3)
+                elif source==indexes[3]: #bm
+                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder,lote_name,source,'nipy_spectral_r',vmin=2000,vmax=3500)
+                elif source==indexes[4]: #cp
+                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder,lote_name,source,'RdYlGn',vmin=5,vmax=18)
+                elif source==indexes[5]: #ndf
+                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder,lote_name,source,'RdYlGn',vmin=30,vmax=60)
+                
+            src.close()
+            
+            #output_folder+analysis_area+'/'+date[:8]+destination

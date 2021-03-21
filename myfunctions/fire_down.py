@@ -28,11 +28,13 @@ class Fire_down:
              pending = sorted(pending, key = lambda i: i['timestamp'],reverse=True)
              user_analysis = pending[0]['user']+"/"+pending[0]['terrain']
              #name = pending[0]['name']
+         '''
          if (Date_Ini == 'no'):
              request_date = firebase.get('coordinatesUser/'+user_analysis+'/timestamp', None) #Conseguir fecha
              time_window = firebase.get('coordinatesUser/'+user_analysis+'/years', None) #Conseguir ventana de tiempo
              Date_Ini = time.strftime('%Y-%m-%d', time.gmtime((int(request_date)/1000) - (int(time_window))*31536000))
              Date_Fin = time.strftime('%Y-%m-%d', time.gmtime(int(request_date)/1000))
+         '''
 
          result = firebase.get('/coordinatesUser/'+user_analysis+'/Coordenadas', None)
          name = firebase.get('coordinatesUser/'+user_analysis+'/name', None) #Conseguir name lote
