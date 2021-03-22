@@ -258,7 +258,7 @@ class Satellite_tools:
             x, y = meta[0]['transform'][2]+area[0]*10, meta[0]['transform'][5]+area[1]*-10    
         return x, y
     
-    def plot_figura2(image, analysis_area, date, output_folder,lote_name,index_str, cmap, **kwargs): #, vmin=-1, vmax=1
+    def plot_figura2(image, analysis_area, date, output_folder, png_folder, lote_name,index_str, cmap, **kwargs): #, vmin=-1, vmax=1
             ext=False
             cen = False
             for key,value in kwargs.items():
@@ -292,5 +292,5 @@ class Satellite_tools:
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size="5%", pad=0.05)
             plt.colorbar(im, cax=cax)
-            plt.savefig(output_folder+analysis_area+'/'+date[:8]+"_"+lote_name+"_"+index_str+".png",bbox_inches='tight',dpi=100)
+            plt.savefig(png_folder+analysis_area+'/'+date[:8]+"_"+lote_name+"_"+index_str+".png",bbox_inches='tight',dpi=100)
             plt.clf()

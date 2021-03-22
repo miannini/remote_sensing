@@ -3,6 +3,7 @@
 # python sat_processing.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E --download yes --date_ini 2020-03-01 --date_fin 2020-03-20 --shape external_shape --own no --erase yes
 #todo declarado - sin external file
 # python sat_processing.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIyk5QHhyIGAnlsH3RJ --download yes --date_ini 2019-10-05 --date_fin 2020-09-30
+# python sat_processing.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIyk5QHhyIGAnlsH3RJ --shape ID_CLIENTE-1
 #
 #sin declarar nada
 # python sat_processing.py
@@ -38,6 +39,7 @@ from myfunctions import Contour_detect
 from myfunctions.temp_stats import Stats_charts
 from myfunctions import Upload_fire
 from myfunctions import Ext_shape
+from myfunctions.tools import GCP_Functions
 import argparse
 
 
@@ -46,7 +48,7 @@ import argparse
 ap = argparse.ArgumentParser()
 ap.add_argument("-u", "--user", default='no',
 	help="path of working user/terrain")
-ap.add_argument("-d", "--download", type=str, default='no',
+ap.add_argument("-d", "--download", type=str, default='yes',
 	help="define if download is required yes/no")
 ap.add_argument("-i", "--date_ini", type=str, default='no',
 	help="define initial date yyyy-mm-dd")
@@ -54,9 +56,9 @@ ap.add_argument("-f", "--date_fin", type=str, default='no',
 	help="define final date yyyy-mm-dd")
 ap.add_argument("-s", "--shape", type=str, default='no',
 	help="optional external shapes folder")
-ap.add_argument("-o", "--own", type=str, default='yes',
+ap.add_argument("-o", "--own", type=str, default='no',
 	help="keep own terrain (only in conjunction with external shapes)")
-ap.add_argument("-e", "--erase", type=str, default='no',
+ap.add_argument("-e", "--erase", type=str, default='yes',
 	help="define if erase unzipped images yes/no")
 ap.add_argument("-l", "--local", type=str, default='no',
 	help="define path of local images to use user_local/cloud/no")
@@ -98,15 +100,30 @@ x_width = 768*2    #16km width
 y_height = 768*2   #16km height
 x_width_cloud = 512    #faster
 y_height_cloud = 512   #faster
-shape_folder = '../Data/shapefiles/'
 
+#shapes and municipios files
+shape_folder = '../Data/shapefiles/'
+folder = 'Colombia/mpos/'
+objetos = list(GCP_Functions.list_all_blobs('shapefiles-storage',prefix=folder,delimiter='/')) #list fro cloud storage
+destination = shape_folder + folder
+Path(destination).mkdir(parents=True, exist_ok=True) #create folder
+for n in objetos:
+    GCP_Functions.download_blob('shapefiles-storage', n, destination + n.split('/')[-1]) #dowloand fro GCP storage
+    
+
+#unzipped_folder='../Data/Unzipped_Images/'
+#Path(shape_folder).mkdir(parents=True, exist_ok=True)
 
 ###funcion para leer firebase
 # de aqui se leen los lotes del json, coordenadas, caja de coordenadas GPS, entre otros
 # si no se define usuario o fechas, estos se basaran en la informacion de Firebase 
 '''
 pasar esto para abajo. calclular caja, lote_aoi, centroide basado en union de lotes shapefiles
+download files from cloud store "shapefiles-storage/Colombia/mpos" y "shapefiles-storage/ID_CLIENTE-1" and copy in .Shapes/ folder
+read lotes, create box, generate AOI
+avoid Firebase
 '''
+Path(shape_folder+analysis_area).mkdir(parents=True, exist_ok=True)
 lote_aoi,lote_aoi_loc,minx,maxx,miny,maxy,bounding_box, user_analysis, analysis_area, Date_Ini, Date_Fin = Fire_down.find_poly(user_analysis,Date_Ini, Date_Fin, shape_folder)       
 
 
@@ -133,7 +150,7 @@ for i in aoi_universal['geometry']:                             #area
 
 ### leer departamentos y municipios
 #basado en archivo externo con shapes de los municipios y dptos de Colombia
-mpos = gpd.read_file('myfunctions/Colombia/mpos/MGN_MPIO_POLITICO.shp')
+mpos = gpd.read_file(shape_folder+'/Colombia/mpos/MGN_MPIO_POLITICO.shp')
 #estandarizar coordenadas a un mismo sistema de referencia
 mpos.crs = {'init':'epsg:4326', 'no_defs': True}
 mpos = gpd.overlay(mpos, lote_aoi, how='intersection')
@@ -147,9 +164,20 @@ Path(database_folder+analysis_area).mkdir(parents=True, exist_ok=True)
     
 #leer shapefiles externos si es requerido
 folder_name = (args["shape"])
-#folder_name = 'external_shape' #'no'
+#folder_name = 'ID_CLIENTE-1' 'external_shape' #'no'
 keep_own = (args["own"]) 
 #keep_own = 'no' 'yes' 'no' #'yes' 
+
+#prefixes
+fincas = GCP_Functions.list_gcs_directories('shapefiles-storage', folder_name+'/')
+for f in fincas:
+    destination = shape_folder + f
+    Path(destination).mkdir(parents=True, exist_ok=True) #create folder
+    #list and download files in corresponding folders
+    objetos = list(GCP_Functions.list_all_blobs('shapefiles-storage',prefix=f,delimiter='/')) 
+    for n in objetos:
+        GCP_Functions.download_blob('shapefiles-storage', n, destination + n.split('/')[-1])
+     
 
 ### si se pasa un archivo de shapefeiles, crear jsons de lotes individuales
 #esto se puede cambiar a data en el storage de GCP, buscando si hay shapefile 
@@ -462,13 +490,8 @@ if folder_name == "no":
 
 
 #obtener fechas basado en nombres, organizar y extraer inicial, media y final
-'''hacerlo para todas las fechas
-ya no enviar a Firebase sino al strage
-hacer loop para cada indice, cada fecha y cada lote
-eso se mostrara en la APP o dashboard
-'''
-png_folder = '../Data/Output_Images/'+analysis_area+'/PNG/'
-Path(png_folder).mkdir(parents=True, exist_ok=True)
+png_folder = '../Data/PNG_Images/'
+Path(png_folder+analysis_area).mkdir(parents=True, exist_ok=True)
 
 #listar los archivos en folder de Output_Images
 arr = os.listdir(output_folder+analysis_area)
@@ -482,7 +505,7 @@ for data_i in dates_in : #cambiar por list_dates
         analysis_date=output_folder+analysis_area+'/'+ data_i
         #folder_out = firebase_folder+analysis_area+'/'+ data_i
         #recortar para cada lote y fecha, tomando cada indice y guardando .png
-        Satellite_proc.small_area_crop_plot(data_i,aoig_near,analysis_area, inde, png_folder)
+        Satellite_proc.small_area_crop_plot(data_i,aoig_near,analysis_area, inde, output_folder, png_folder)
 end = time.time()
 print(end - start) 
 

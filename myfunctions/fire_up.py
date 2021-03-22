@@ -8,7 +8,7 @@ import glob
 
 class Upload_fire:
     def upload_image(folder,analysis_area,user_analysis):
-        cred = credentials.Certificate('KeyTerrenos.json')
+        cred = credentials.Certificate('secrets/KeyTerrenos.json')
         #si no existe, inizializar, sino, saltar
         try:
             firebase_admin.initialize_app(cred, {

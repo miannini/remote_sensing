@@ -390,7 +390,7 @@ class Satellite_proc:
         return route, name1, folder_safe
     
     #function to plot indexes by lote
-    def small_area_crop_plot(date,aoig_near,analysis_area, source, output_folder): #aoi2,"_NDVI.tif", "_NDVI_lote.tif","Output_Images/" ,lote_name
+    def small_area_crop_plot(date,aoig_near,analysis_area, source, output_folder, png_folder): #aoi2,"_NDVI.tif", "_NDVI_lote.tif","Output_Images/" ,lote_name
         with rio.open(output_folder+analysis_area+'/'+date[:8]+source+".tif") as src:
             indexes = ["_ndvi","_atsavi","_lai","_bm","_cp","_ndf"]
             #incluir aqui el loop para recortar los lotes, evitando I/O por cada lote
@@ -399,17 +399,17 @@ class Satellite_proc:
                 lote_name = aoig_near['name'][n] 
                 #out_image, out_transform = rio.mask.mask(src, aoi2,crop=True) 
                 if source==indexes[0]: #ndvi
-                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder,lote_name,source,'RdYlGn',vmin=-1,vmax=1)
+                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder, png_folder, lote_name,source,'RdYlGn',vmin=-1,vmax=1)
                 elif source==indexes[1]: #atsavi
-                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder,lote_name,source,'RdYlGn',vmin=0,vmax=1)
+                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder, png_folder, lote_name,source,'RdYlGn',vmin=0,vmax=1)
                 elif source==indexes[2]: #lai
-                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder,lote_name,source,'nipy_spectral_r',vmin=0,vmax=3)
+                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder, png_folder, lote_name,source,'nipy_spectral_r',vmin=0,vmax=3)
                 elif source==indexes[3]: #bm
-                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder,lote_name,source,'nipy_spectral_r',vmin=2000,vmax=3500)
+                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder, png_folder, lote_name,source,'nipy_spectral_r',vmin=2000,vmax=3500)
                 elif source==indexes[4]: #cp
-                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder,lote_name,source,'RdYlGn',vmin=5,vmax=18)
+                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder, png_folder, lote_name,source,'RdYlGn',vmin=5,vmax=18)
                 elif source==indexes[5]: #ndf
-                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder,lote_name,source,'RdYlGn',vmin=30,vmax=60)
+                    Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder, png_folder, lote_name,source,'RdYlGn',vmin=30,vmax=60)
                 
             src.close()
             
