@@ -2,13 +2,13 @@
 from shapely.geometry import Polygon
 from firebase import firebase
 import geopandas as gpd
-import folium 
-import pandas as pd
-import matplotlib.pyplot as plt
+#import folium 
+#import pandas as pd
+#import matplotlib.pyplot as plt
 import shapefile
 from pyproj import Proj, transform
 from sentinelhub import BBox, CRS
-import time
+#import time
 
 firebase = firebase.FirebaseApplication('https://proyectopiloto-28591.firebaseio.com/', None)
 

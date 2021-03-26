@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import math
 import matplotlib.pyplot as plt
-import shapefile
+#import shapefile
 import datetime
 from sentinelhub import WmsRequest, BBox, CRS, MimeType, CustomUrlParam, get_area_dates, SentinelHubRequest, SentinelHubDownloadClient, bbox_to_dimensions, DownloadRequest, DataCollection, SHConfig
 from s2cloudless import S2PixelCloudDetector, CloudMaskRequest

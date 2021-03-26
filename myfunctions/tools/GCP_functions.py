@@ -6,7 +6,6 @@ Created on Sat Mar 13 21:38:29 2021
 """
 import os
 from google.cloud import storage
-import regex as re
 from pathlib import Path
 import glob
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="secrets/data-science-proj-280908-e7130591b0d5.json" #D:/M4A/git_folder/Satellite_analysis_v2/

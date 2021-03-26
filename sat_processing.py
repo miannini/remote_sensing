@@ -1,18 +1,11 @@
 # USAGE
 #todo declarado
-# python sat_processing.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E --download yes --date_ini 2020-03-01 --date_fin 2020-03-20 --shape external_shape --own no --erase yes
+# python sat_processing.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E --download yes --date_ini 2020-03-01 --date_fin 2020-03-20 --shape ID_CLIENTE-1 --own no --erase yes
 #todo declarado - sin external file
 # python sat_processing.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIyk5QHhyIGAnlsH3RJ --download yes --date_ini 2019-10-05 --date_fin 2020-09-30
-# python sat_processing.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIyk5QHhyIGAnlsH3RJ --shape ID_CLIENTE-1
+# python sat_processing.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E --shape ID_CLIENTE-1
 #
-#sin declarar nada
-# python sat_processing.py
-# declarando solo fecha
-# python sat_processing.py --download no --date_ini 2020-01-01 --date_fin 2020-01-31
-# declarando solo user
-# python sat_processing.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E --download no
-#analisis de imagenes locales
-# python sat_processing.py --date_ini 2019-10-01 --date_fin 2020-10-20 --download yes --erase yes
+
 
 ### leer librerias
 import numpy as np
@@ -23,7 +16,7 @@ from pathlib import Path
 import datetime
 from os import listdir
 from os.path import isfile, join
-import seaborn as sns
+#import seaborn as sns
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -67,8 +60,8 @@ args = vars(ap.parse_args())
 #inicializacion de variables - fechas
 Date_Ini = (args["date_ini"]) 
 Date_Fin = (args["date_fin"]) 
-#Date_Ini= '2021-03-10'#'2020-09-11'
-#Date_Fin= '2021-03-20'#'2021-02-02'
+#Date_Ini= '2021-03-10'
+#Date_Fin= '2021-03-20'
 
 if Date_Ini == 'no':
     Date_Ini = (datetime.date.today()-datetime.timedelta(days=5)).strftime("%Y-%m-%d")
@@ -87,10 +80,14 @@ user_analysis = (args["user"])
 #user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIzHZ9Kr8cUvkQyBgY5' #Ibague_arroz
 #user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MKK7Su7NDUn_-iY1DdQ' #guasimo
 #user_analysis = 'no' # auto
+#user_analysis = 'ID_CLIENTE-1'
 
 ### si el usuario se deifnio, tomarlo del string tomando la segunda parte despues de /
 if user_analysis != 'no' : 
-    analysis_area = user_analysis.split("/")[1]
+    try:
+        analysis_area = user_analysis.split("/")[1]
+    except:
+        analysis_area = user_analysis
 
 ### definir constantes basicas para medidas
 # todo se hace con base 512, las nubes se descargan a 512pxl, mientras que las areas de descarga
@@ -104,6 +101,7 @@ y_height_cloud = 512   #faster
 #shapes and municipios files
 shape_folder = '../Data/shapefiles/'
 folder = 'Colombia/mpos/'
+#listar de Cloud storage
 objetos = list(GCP_Functions.list_all_blobs('shapefiles-storage',prefix=folder,delimiter='/')) #list fro cloud storage
 destination = shape_folder + folder
 Path(destination).mkdir(parents=True, exist_ok=True) #create folder
@@ -111,36 +109,47 @@ for n in objetos:
     GCP_Functions.download_blob('shapefiles-storage', n, destination + n.split('/')[-1]) #dowloand fro GCP storage
     
 
-#unzipped_folder='../Data/Unzipped_Images/'
-#Path(shape_folder).mkdir(parents=True, exist_ok=True)
-
 ###funcion para leer firebase
 # de aqui se leen los lotes del json, coordenadas, caja de coordenadas GPS, entre otros
 # si no se define usuario o fechas, estos se basaran en la informacion de Firebase 
+
+#leer shapefiles externos si es requerido
+folder_name = (args["shape"])
+#folder_name = 'ID_CLIENTE-1' 'external_shape' #'no'
+
+
+if folder_name != 'no': #si se define shape, es porque existe bigbox en cloud store, entonces descargar
+    folder = 'BBOX/'
+    #listar de Cloud storage
+    objetos = list(GCP_Functions.list_all_blobs('shapefiles-storage',prefix=folder_name+'/'+folder,delimiter='/')) #list fro cloud storage
+    destination = shape_folder + folder_name + '/' + folder
+    Path(destination).mkdir(parents=True, exist_ok=True) #create folder
+    for n in objetos:
+        if len(n.split('/')[-1])>0:
+            GCP_Functions.download_blob('shapefiles-storage', n, destination + n.split('/')[-1]) #dowloand fro GCP storage
+    aoi = gpd.read_file(destination+'/big_box.shp') 
+
+else: #si no hay shape, entonces leer desde firebase
+    Path(shape_folder+analysis_area).mkdir(parents=True, exist_ok=True)
+    lote_aoi,lote_aoi_loc,minx,maxx,miny,maxy,bounding_box, user_analysis, analysis_area, Date_Ini, Date_Fin = Fire_down.find_poly(user_analysis,Date_Ini, Date_Fin, shape_folder)       
+
+    ### print de lo que se encuentra en Firebase para mostrar que se analizara
+    print("[INFO] box coordinates (min_x, max_x = {:.2f}, {:.2f})".format(minx,maxx))
+    print("[INFO] box coordinates (min_y, max_y = {:.2f}, {:.2f})".format(miny,maxy))
+    print("[INFO] tiempo de analisis (fecha_inicial, fecha_final = {}, {})".format(Date_Ini, Date_Fin))
+    print("[INFO] usuario y terreno de analisis (usuario, terreno, finca= {} / {})".format(user_analysis,lote_aoi["name"]))
+    ###leer shapefile
+    # el area big_box se basa en firebase, que previamente se guardo en el sistema
+    aoi = gpd.read_file(shape_folder+analysis_area+'/big_box.shp') #para imagen satelital
+
 '''
-pasar esto para abajo. calclular caja, lote_aoi, centroide basado en union de lotes shapefiles
-download files from cloud store "shapefiles-storage/Colombia/mpos" y "shapefiles-storage/ID_CLIENTE-1" and copy in .Shapes/ folder
-read lotes, create box, generate AOI
-avoid Firebase
+epsg guardar en DB y traer, para cada cliente
+crs cambiar a nuevo formato para evitar errores
 '''
-Path(shape_folder+analysis_area).mkdir(parents=True, exist_ok=True)
-lote_aoi,lote_aoi_loc,minx,maxx,miny,maxy,bounding_box, user_analysis, analysis_area, Date_Ini, Date_Fin = Fire_down.find_poly(user_analysis,Date_Ini, Date_Fin, shape_folder)       
-
-
-### print de lo que se encuentra en Firebase para mostrar que se analizara
-print("[INFO] box coordinates (min_x, max_x = {:.2f}, {:.2f})".format(minx,maxx))
-print("[INFO] box coordinates (min_y, max_y = {:.2f}, {:.2f})".format(miny,maxy))
-print("[INFO] tiempo de analisis (fecha_inicial, fecha_final = {}, {})".format(Date_Ini, Date_Fin))
-print("[INFO] usuario y terreno de analisis (usuario, terreno, finca= {} / {})".format(user_analysis,lote_aoi["name"]))
-
-    
-###leer shapefile
-# el area big_box se basa en firebase, que previamente se guardo en el sistema
-aoi = gpd.read_file(shape_folder+analysis_area+'/big_box.shp') #para imagen satelital
-
 # el CRS y EPSG son terminos geo-espaciales, para definir referencia base de esfera a plano
 aoi.crs = {'init':'epsg:32618', 'no_defs': True}
-aoi_universal= aoi.to_crs(4326)                                 #para API sentinel
+#aoi_universal= aoi.to_crs(4326)                                 #para API sentinel
+aoi_universal= aoi.to_crs("EPSG:4326") 
 
 # el footprint es para hallar imagenes satelitales que contengan esta area
 # y despues extraer la parte de la imagen que solo contiene esta area de interes
@@ -148,28 +157,17 @@ footprint = None
 for i in aoi_universal['geometry']:                             #area
     footprint = i
 
-### leer departamentos y municipios
-#basado en archivo externo con shapes de los municipios y dptos de Colombia
-mpos = gpd.read_file(shape_folder+'/Colombia/mpos/MGN_MPIO_POLITICO.shp')
-#estandarizar coordenadas a un mismo sistema de referencia
-mpos.crs = {'init':'epsg:4326', 'no_defs': True}
-mpos = gpd.overlay(mpos, lote_aoi, how='intersection')
-#traer solo el municipio y departamento mas cercano
-municipio, departamento = mpos.loc[0,'MPIO_CNMBR'], mpos.loc[0,'DPTO_CNMBR']
-
 # crear folder para guardar 'database'
 # reemplazar por DB real de SQL o archivo de cloud storage
 database_folder = '../Data/Database/'
 Path(database_folder+analysis_area).mkdir(parents=True, exist_ok=True)
     
-#leer shapefiles externos si es requerido
-folder_name = (args["shape"])
-#folder_name = 'ID_CLIENTE-1' 'external_shape' #'no'
+
 keep_own = (args["own"]) 
 #keep_own = 'no' 'yes' 'no' #'yes' 
 
 #prefixes
-fincas = GCP_Functions.list_gcs_directories('shapefiles-storage', folder_name+'/')
+fincas = GCP_Functions.list_gcs_directories('shapefiles-storage', folder_name+'/'+"ID_FINCA")
 for f in fincas:
     destination = shape_folder + f
     Path(destination).mkdir(parents=True, exist_ok=True) #create folder
@@ -180,14 +178,19 @@ for f in fincas:
      
 
 ### si se pasa un archivo de shapefeiles, crear jsons de lotes individuales
-#esto se puede cambiar a data en el storage de GCP, buscando si hay shapefile 
+'''esto se puede cambiar a data en el storage de GCP, buscando si hay shapefile '''
+
 if folder_name != "no":
-    todos_lotes, todos_lotes_loc = Ext_shape.merge_shapes(shape_folder,lote_aoi,lote_aoi_loc,folder_name,analysis_area)
-    #si se definio external shapefiles, aoig_near contendra la misma info
-    if keep_own != 'yes':
-        todos_lotes=todos_lotes.iloc[1:,:] #remove row 0 is firebase terrain
-        todos_lotes_loc=todos_lotes_loc.iloc[1:,:] #remove row 0 is firebase terrain
-        print("[info] lote de firebase, removido del analisis")
+    if 'lote_aoi' in locals():
+        print('yes')
+        todos_lotes, todos_lotes_loc = Ext_shape.merge_shapes(shape_folder,lote_aoi,lote_aoi_loc,folder_name,analysis_area)
+        #si se definio external shapefiles, aoig_near contendra la misma info
+        if keep_own != 'yes':
+            todos_lotes=todos_lotes.iloc[1:,:] #remove row 0 is firebase terrain
+            todos_lotes_loc=todos_lotes_loc.iloc[1:,:] #remove row 0 is firebase terrain
+            print("[info] lote de firebase, removido del analisis")
+    else:
+        todos_lotes, todos_lotes_loc = Ext_shape.merge_shapes2(shape_folder,folder_name,analysis_area)    
     aoig_near = todos_lotes_loc
     lote_aoi_loc = todos_lotes_loc
     print("[info] lotes totales incluyendo de archivo externo = {}".format(len(todos_lotes)))
@@ -200,6 +203,16 @@ if folder_name != "no":
     for i in range(0,len(todos_lotes)):
         temp = todos_lotes[todos_lotes.index == i] #filter geodataframe, keeping same format to export
         temp.to_file(shape_folder+analysis_area+'/multiples_json/'+todos_lotes.iloc[i,0]+'.geojson', driver ='GeoJSON')
+
+
+### leer departamentos y municipios
+#basado en archivo externo con shapes de los municipios y dptos de Colombia
+mpos = gpd.read_file(shape_folder+'/Colombia/mpos/MGN_MPIO_POLITICO.shp')
+#estandarizar coordenadas a un mismo sistema de referencia
+mpos.crs = {'init':'epsg:4326', 'no_defs': True}
+mpos = gpd.overlay(mpos, todos_lotes[0:1] , how='intersection') #lote_aoi, aoi_universal
+#traer solo el municipio y departamento mas cercano
+municipio, departamento = mpos.loc[0,'MPIO_CNMBR'], mpos.loc[0,'DPTO_CNMBR']
 
 
 ### folder de imagenes nubes
@@ -434,7 +447,7 @@ if folder_name != "no": #shapefile fue provisto entonces
     flattened['biomass_corrected'] = flattened["mean_value._bm"]*(flattened["area"]/(100*100))
     ''' aqui voy'''
     #esto enviarlo directo a storage
-    #version resumida de 'resumen_lotes_medidas' enviar a database directamente [agregar finca, quitar percentiles, bandas y coordenadas]
+    '''version resumida de 'resumen_lotes_medidas' enviar a database directamente [agregar finca, quitar percentiles, bandas y coordenadas]'''
     flattened.to_csv (r'../Data/Database/'+analysis_area+'/resumen_lotes_medidas'+Date_Fin+'.csv', index = True, header=True)
     resumen_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_vertical_lotes_medidas'+Date_Fin+'.csv', index = True, header=True)
     print("[INFO] data table exported as CSV")

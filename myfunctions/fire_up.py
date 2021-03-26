@@ -3,7 +3,7 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import storage
 from firebase import firebase
-import cv2
+#import cv2
 import glob
 
 class Upload_fire:

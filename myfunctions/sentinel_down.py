@@ -3,9 +3,9 @@ import pandas as pd
 import zipfile
 import datetime
 from sentinelsat import SentinelAPI
-from geopandas import GeoSeries
-import geopandas as gpd
-from shapely.geometry import Polygon
+#from geopandas import GeoSeries
+#import geopandas as gpd
+#from shapely.geometry import Polygon
 user = 'miannini'
 password = 'An4lytics@89'
 api = SentinelAPI(user, password, 'https://scihub.copernicus.eu/dhus')

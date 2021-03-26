@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import shapefile
+#import shapefile
 import datetime
 from sentinelhub import WmsRequest, BBox, CRS, MimeType, CustomUrlParam, get_area_dates
 from s2cloudless import S2PixelCloudDetector, CloudMaskRequest

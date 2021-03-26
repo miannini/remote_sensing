@@ -3,15 +3,15 @@ import numpy as np
 import rasterio as rio
 from rasterio.mask import mask
 from rasterio.merge import merge
-from rasterio.plot import show
-from osgeo import gdal_array
+#from rasterio.plot import show
+#from osgeo import gdal_array
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.ndimage import interpolation
 import cv2
-from varname import nameof, Wrapper, varname
+#from varname import nameof, Wrapper, varname
 import inspect
 from sklearn.preprocessing import MinMaxScaler, RobustScaler
 from myfunctions.tools import MidpointNormalize

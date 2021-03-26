@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import os
 import rasterstats as rs
-import seaborn as sns
+#import seaborn as sns
 
 
 
