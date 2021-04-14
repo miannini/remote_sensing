@@ -4,7 +4,7 @@
 #todo declarado - sin external file
 # python sat_processing.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIyk5QHhyIGAnlsH3RJ --download yes --date_ini 2019-10-05 --date_fin 2020-09-30
 # python sat_processing.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E --shape ID_CLIENTE-1
-#
+# python sat_processing.py --user ID_CLIENTE-1 --date_ini 2021-03-01 --date_fin 2021-03-26 --shape ID_CLIENTE-1
 
 
 ### leer librerias
@@ -24,22 +24,25 @@ import cv2
 import shutil
 import time
 import glob
-from myfunctions import Fire_down
+import math
+
 #from myfunctions import Cloud_finder
 from myfunctions import Sentinel_downloader
 from myfunctions import Satellite_proc
 from myfunctions import Contour_detect
 from myfunctions.temp_stats import Stats_charts
-from myfunctions import Upload_fire
+#from myfunctions import Upload_fire
 from myfunctions import Ext_shape
 from myfunctions.tools import GCP_Functions
+from myfunctions.tools import Tools
+from myfunctions import API_usage
 import argparse
 
 
 ### variables dinamicas para correr en terminal unicamente
 # argparse permite ingresar variables en CMD para correr python desde hi ocn inputs
 ap = argparse.ArgumentParser()
-ap.add_argument("-u", "--user", default='no',
+ap.add_argument("-u", "--user", default='auto',
 	help="path of working user/terrain")
 ap.add_argument("-d", "--download", type=str, default='yes',
 	help="define if download is required yes/no")
@@ -60,8 +63,8 @@ args = vars(ap.parse_args())
 #inicializacion de variables - fechas
 Date_Ini = (args["date_ini"]) 
 Date_Fin = (args["date_fin"]) 
-#Date_Ini= '2021-03-10'
-#Date_Fin= '2021-03-20'
+#Date_Ini= '2021-04-04'
+#Date_Fin= '2021-04-10'
 
 if Date_Ini == 'no':
     Date_Ini = (datetime.date.today()-datetime.timedelta(days=5)).strftime("%Y-%m-%d")
@@ -81,13 +84,50 @@ user_analysis = (args["user"])
 #user_analysis = '7x27nHWFRKZhXePiHbVfkHBx9MC3/-MKK7Su7NDUn_-iY1DdQ' #guasimo
 #user_analysis = 'no' # auto
 #user_analysis = 'ID_CLIENTE-1'
+#user_analysis = 'auto'
 
+#leer shapefiles externos si es requerido
+folder_name = (args["shape"])
+#folder_name = 'ID_CLIENTE-1' 'external_shape' #'no'
+
+
+'''
 ### si el usuario se deifnio, tomarlo del string tomando la segunda parte despues de /
 if user_analysis != 'no' : 
     try:
         analysis_area = user_analysis.split("/")[1]
     except:
         analysis_area = user_analysis
+'''
+
+
+''' automatizado
+1- Function for login to API, store token and get Clientes, lotes,
+'''
+token = API_usage.login_api()
+clientes = API_usage.get_clientes(token)
+lotes = API_usage.get_lotes(token)
+
+#leer ultimas filas de lotes_variables del cliente
+'''
+si hay datos, date_ini es la mayor fecha de la tabla SQL, sino, date_ini es la menor de las imagenes
+bajar data.json de bucket, al final hacer merge y subir a GCP
+bajar bandas_semnanal.csv, al final hacer merge y subir a GCP 
+'''
+
+'''
+1-b loop throught clientes and read lotes
+'''
+if user_analysis == 'auto':
+    clientes = clientes[0:1]
+    #define user
+    for client in clientes:
+        print (client)
+        cliente = 'ID_CLIENTE-'+str(client)
+        analysis_area = cliente
+        user_analysis = cliente
+        folder_name = cliente
+
 
 ### definir constantes basicas para medidas
 # todo se hace con base 512, las nubes se descargan a 512pxl, mientras que las areas de descarga
@@ -113,9 +153,7 @@ for n in objetos:
 # de aqui se leen los lotes del json, coordenadas, caja de coordenadas GPS, entre otros
 # si no se define usuario o fechas, estos se basaran en la informacion de Firebase 
 
-#leer shapefiles externos si es requerido
-folder_name = (args["shape"])
-#folder_name = 'ID_CLIENTE-1' 'external_shape' #'no'
+
 
 
 if folder_name != 'no': #si se define shape, es porque existe bigbox en cloud store, entonces descargar
@@ -130,6 +168,7 @@ if folder_name != 'no': #si se define shape, es porque existe bigbox en cloud st
     aoi = gpd.read_file(destination+'/big_box.shp') 
 
 else: #si no hay shape, entonces leer desde firebase
+    from myfunctions import Fire_down
     Path(shape_folder+analysis_area).mkdir(parents=True, exist_ok=True)
     lote_aoi,lote_aoi_loc,minx,maxx,miny,maxy,bounding_box, user_analysis, analysis_area, Date_Ini, Date_Fin = Fire_down.find_poly(user_analysis,Date_Ini, Date_Fin, shape_folder)       
 
@@ -204,6 +243,18 @@ if folder_name != "no":
         temp = todos_lotes[todos_lotes.index == i] #filter geodataframe, keeping same format to export
         temp.to_file(shape_folder+analysis_area+'/multiples_json/'+todos_lotes.iloc[i,0]+'.geojson', driver ='GeoJSON')
 
+### corregir nombres lotes y unir con ID
+aoig_near['name'] = aoig_near['name'].apply(lambda x: Tools.corr_num(x))
+aoig_near = aoig_near.merge(lotes.iloc[:,1:], how='left', left_on=['name'], right_on=['nombre_lote'])
+aoig_near.drop(columns=['nombre_lote'], inplace=True)
+#aoig_near.set_index('lote_id', inplace=True); aoig_near.sort_index(inplace=True)
+
+todos_lotes['name'] = todos_lotes['name'].apply(lambda x: Tools.corr_num(x))
+todos_lotes = todos_lotes.merge(lotes.iloc[:,1:], how='left', left_on=['name'], right_on=['nombre_lote'])
+todos_lotes.drop(columns=['nombre_lote'], inplace=True)
+#todos_lotes.set_index('lote_id', inplace=True); todos_lotes.sort_index(inplace=True)
+
+
 
 ### leer departamentos y municipios
 #basado en archivo externo con shapes de los municipios y dptos de Colombia
@@ -275,15 +326,9 @@ count_of_clouds = pd.DataFrame()
 #si no se tienen archivos locales //es lo normal
 if local_files =='no': 
     #inicializar variables
-    R10=''
-    date=''
-    hora=''
-    date_max=date
+    R10=''; date=''; hora='' ; date_max=date
     for dire in direcciones:
-        R10=dire+'/'
-        date= R10.split("_")[-2][:8]
-        hora=R10.split("_")[-2][9:15]
-        zone= R10.split("_")[-4][:]
+        R10=dire+'/'; date= R10.split("_")[-2][:8]; hora=R10.split("_")[-2][9:15]; zone= R10.split("_")[-4][:]
         #find cloud mask date file    
         ind_mask = []
         datelong = date+" " +hora
@@ -434,6 +479,7 @@ if 'best_date' not in locals():
     best_date = count_of_clouds.loc[count_of_clouds.groupby('date')['clear_pxl_count'].idxmax()].date[0]
 
 
+
 #exportar datos CSV
 if folder_name != "no": #shapefile fue provisto entonces
     #convert from pivot table to dataframe
@@ -445,10 +491,57 @@ if folder_name != "no": #shapefile fue provisto entonces
     flattened['area_factor']= (flattened["count_pxl._bm"]/flattened["count_pxl._ind"])*((100*flattened["count_pxl._bm"])/flattened["area"]) #mayor a 1 se debe reducir, menor a 1 se debe sumar
     #Biomass corrected value
     flattened['biomass_corrected'] = flattened["mean_value._bm"]*(flattened["area"]/(100*100))
-    ''' aqui voy'''
-    #esto enviarlo directo a storage
-    '''version resumida de 'resumen_lotes_medidas' enviar a database directamente [agregar finca, quitar percentiles, bandas y coordenadas]'''
-    flattened.to_csv (r'../Data/Database/'+analysis_area+'/resumen_lotes_medidas'+Date_Fin+'.csv', index = True, header=True)
+    
+    #organizar por lote_id y reemplazar poly
+    flattened = pd.merge(flattened, aoig_near.iloc[:,-1], left_on='poly', right_index=True)# (type_df, time_df, left_index=True, right_on='Project')
+    flattened['poly'] = flattened['lote_id']
+    flattened.drop(columns=['lote_id'], inplace=True)
+    flattened.rename(columns={'poly':'lote_id'}, inplace=True)
+    flattened.sort_values(by=['lote_id', 'date'], inplace=True) #ahora llamar lote_id
+    
+    '''version resumida de 'resumen_lotes_medidas' enviar a database usando API'''
+    start=time.time()
+    #define columns, rename as per API and format dates 
+    reduced_columns=['lote_id','date','mean_value._bm','mean_value._cp','mean_value._ndf','mean_value._lai','mean_value._ndvi','cld_percentage','area_factor','biomass_corrected']
+    reduced_flat = flattened.loc[:,flattened.columns.isin(reduced_columns)]
+    reduced_flat.rename(columns={'lote_id':'ID_lote','date':'fecha','mean_value._bm':'Mean_BM','mean_value._cp':'Mean_CP','mean_value._ndf':'Mean_NDF','mean_value._lai':'Mean_LAI','mean_value._ndvi':'Mean_NDVI'}, inplace=True)
+    reduced_flat['fecha'] = pd.to_datetime(reduced_flat['fecha'], format="%Y%m%d").dt.strftime('%Y-%m-%d')
+    #reorder columns as per API
+    cols = reduced_flat.columns.tolist()
+    cols = cols[1:2] + cols[0:1] + cols[2:]
+    reduced_flat = reduced_flat[cols] 
+    #to dictionary
+    data_dict = reduced_flat.to_dict(orient='records')
+    #loop each row, remove nan and post API
+    for data_row in data_dict:
+        to_del=[]
+        for k,v in data_row.items():
+            if type(v) == float and math.isnan(v):
+                print(k,'delete')
+                to_del.append(k)
+        for n in to_del:
+            data_row.pop(n)
+        API_usage.post_lote_var(token,data_row)
+    end = time.time()
+    print(end - start) 
+    
+    #upload to SQL database calling API 
+    '''
+    aqui voy
+    en archivo ready, cambiar poly a lote_id [usar python, no es tan facil como cambiar titulo]
+    crear json desde aqui, si es necesario
+    cliente, finca, lote_id, [nombre_lote, banda], fecha, [min, mean, max, std, kurt, stats, percs...]
+    '''
+    
+    #organizar por lote_id y reemplazar poly
+    resumen_bandas.reset_index(inplace=True)
+    resumen_bandas['poly'] = resumen_bandas['lote_id']
+    resumen_bandas.drop(columns=['lote_id'], inplace=True)
+    resumen_bandas.rename(columns={'poly':'lote_id'}, inplace=True)
+    resumen_bandas.sort_values(by=['lote_id', 'date', 'band'], inplace=True)
+    
+    #esto enviarlo directo a storage  
+    flattened.to_csv (r'../Data/Database/'+analysis_area+'/resumen_lotes_medidas'+Date_Fin+'.csv', index = False, header=True)
     resumen_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_vertical_lotes_medidas'+Date_Fin+'.csv', index = True, header=True)
     print("[INFO] data table exported as CSV")
 
@@ -591,7 +684,13 @@ plt.clf()
 #esto se podria quitar, y dejar solo en google cloud store
 #Upload_fire.upload_image(firebase_folder,analysis_area,user_analysis)
 #print("[INFO] images uploaded to Firebase")
-
+'''
+al final deberia hacer un post o get, para activar pub/sub de GCP
+correr codigo fuente linux, para mover archivos al storage
+eliminar todas las carpetas de Data en la maquina
+hacer un reporte de clientes analizados, fincas analizadas, tiempo en ejecucion, fecha y guardar en DB
+apagar VM
+'''
 ### delete downloaded unzipped images
 #esto se podria quitar, y mas bien enviar a un coldstorage de las bandas cropped, no la imagen total
 erase_yes = (args["erase"])
@@ -599,4 +698,6 @@ erase_yes = (args["erase"])
 if erase_yes == 'yes':
     shutil.rmtree(unzipped_folder, ignore_errors=True)
     print("[INFO] unzipped images erased")
+    
+
     

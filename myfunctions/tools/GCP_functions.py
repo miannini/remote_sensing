@@ -7,9 +7,19 @@ Created on Sat Mar 13 21:38:29 2021
 import os
 from google.cloud import storage
 from pathlib import Path
+from google.oauth2 import service_account
+
+#option GLOB
 import glob
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"]="secrets/data-science-proj-280908-e7130591b0d5.json" #D:/M4A/git_folder/Satellite_analysis_v2/
 
+#option JSON - import directly storage_client in functions
+'''
+with open('secrets/data-science-proj-280908-8d27b68e1653.json') as source:
+    info = json.load(source)
+storage_credentials = service_account.Credentials.from_service_account_info(info)
+storage_client = storage.Client(project=project_id, credentials=storage_credentials)
+'''
 
 # FUNCTIONS #
 class GCP_Functions:
@@ -153,6 +163,47 @@ class GCP_Functions:
     #for n in objetos:
     #    download_blob('shapefiles-storage', n, destination + n.split('/')[-1])
     
+    ### Copiar Objetos 
+    def copy_blob(bucket_name, blob_name, destination_bucket_name, destination_blob_name):
+        """Copies a blob from one bucket to another with a new name."""
+        # bucket_name = "your-bucket-name"
+        # blob_name = "your-object-name"
+        # destination_bucket_name = "destination-bucket-name"
+        # destination_blob_name = "destination-object-name"
+    
+        storage_client = storage.Client()
+        source_bucket = storage_client.bucket(bucket_name)
+        source_blob = source_bucket.blob(blob_name)
+        destination_bucket = storage_client.bucket(destination_bucket_name)
+    
+        blob_copy = source_bucket.copy_blob(
+            source_blob, destination_bucket, destination_blob_name
+        )
+    
+        print(
+            "Blob {} in bucket {} copied to blob {} in bucket {}.".format(
+                source_blob.name,
+                source_bucket.name,
+                blob_copy.name,
+                destination_bucket.name,
+            )
+        )
+    
+    
+    ### Eliminar Objetos
+    def delete_blob(bucket_name, blob_name):
+        """Deletes a blob from the bucket."""
+        # bucket_name = "your-bucket-name"
+        # blob_name = "your-object-name"
+    
+        storage_client = storage.Client()
+    
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+        blob.delete()
+    
+        print("Blob {} deleted.".format(blob_name))
+    
     
     ### listar labels de un bucket
     def get_bucket_labels(bucket_name):
@@ -166,3 +217,12 @@ class GCP_Functions:
     
     #usar funcion
     #get_bucket_labels(bucket_name)
+    
+#posible run gsutil gunctions from python
+'''
+import subprocess
+subprocess.run(["ls", "-l"],capture_output=True)
+
+subprocess.run(["gsutil", "cp", "-r", "gs://data-science-proj-280908/Satellite/Data/Data/Database/-MAa0O5PMyE81I_AFC6E test"])
+'''
+#to try later

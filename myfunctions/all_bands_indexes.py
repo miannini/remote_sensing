@@ -396,7 +396,7 @@ class Satellite_proc:
             #incluir aqui el loop para recortar los lotes, evitando I/O por cada lote
             for n, geo in enumerate (aoig_near.geometry):
                 out_image, out_transform = rio.mask.mask(src, [geo],crop=True)  
-                lote_name = aoig_near['name'][n] 
+                lote_name = aoig_near['lote_id'][n] 
                 #out_image, out_transform = rio.mask.mask(src, aoi2,crop=True) 
                 if source==indexes[0]: #ndvi
                     Satellite_tools.plot_figura2(out_image, analysis_area, date, output_folder, png_folder, lote_name,source,'RdYlGn',vmin=-1,vmax=1)

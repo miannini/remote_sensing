@@ -39,7 +39,7 @@ class Stats_charts:
             data = rs.zonal_stats(aoig_near, analysis_date+band,  #"_NDVI.tif"
                                   stats="count",
                                   add_stats={'reduct': reduct}, layer=1)
-            porygons = full_append(data,range(0,len(aoig_near)))
+            porygons = full_append(data, range(0,len(aoig_near))) #range(0,len(aoig_near))
             Ndate = np.shape(porygons)[0]
             dateAssign = np.repeat( data_i , Ndate)
             datag = { 'date':dateAssign,'poly':porygons['poly'],'data_pixel':porygons['data'],'band':band.split('.')[0]  }

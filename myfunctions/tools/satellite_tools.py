@@ -285,12 +285,12 @@ class Satellite_tools:
             else:
                 im = ax.imshow(image[0], cmap=cmap, vmin=np.nanpercentile(image,1), vmax=np.nanpercentile(image,99)) #'RdYlGn'
             #plot
-            plt.title(index_str+' in ' + lote_name)
+            plt.title(index_str+' in ' + str(lote_name))
             plt.xlabel('Latitude')
             plt.ylabel('Longitude')
             #to locate colorbar
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size="5%", pad=0.05)
             plt.colorbar(im, cax=cax)
-            plt.savefig(png_folder+analysis_area+'/'+date[:8]+"_"+lote_name+"_"+index_str+".png",bbox_inches='tight',dpi=100)
+            plt.savefig(png_folder+analysis_area+'/'+date[:8]+"_"+str(lote_name)+index_str+".png",bbox_inches='tight',dpi=100)
             plt.clf()
