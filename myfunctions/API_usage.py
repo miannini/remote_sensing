@@ -110,7 +110,7 @@ class API_usage:
         path = 'Wr_lotes_variables/'
         response = requests.post(url+path, json = data_row ,headers=hed)
         print(response.status_code)
-        print(response.json())
+        #print(response.json())
         
         
     def post_lote_qui(token, data_row):
