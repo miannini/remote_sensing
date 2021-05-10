@@ -42,7 +42,7 @@ class Sentinel_downloader:
         products_df = pd.DataFrame()
         for b in range(0,len(products_gdf_sorted)):
             #dar formato a fecha de la imagen satelital disponible
-            api_id = str(products_gdf_sorted.iloc[b,7]).split(".")[0]
+            api_id = str(products_gdf_sorted.iloc[b,6]).split(".")[0]
             api_id = datetime.datetime.strptime(api_id, '%Y-%m-%d %H:%M:%S')
             #for c in range(0,len(valid_dates)):
             #    valid_dates_id_1 = datetime.datetime.strptime(valid_dates[c][0], '%Y-%m-%d') #str(valid_dates.iloc[c,0]).split()[0]

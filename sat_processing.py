@@ -5,7 +5,7 @@
 # python sat_processing.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MIyk5QHhyIGAnlsH3RJ --download yes --date_ini 2019-10-05 --date_fin 2020-09-30
 # python sat_processing.py --user 7x27nHWFRKZhXePiHbVfkHBx9MC3/-MAa0O5PMyE81I_AFC6E --shape ID_CLIENTE-1
 # python sat_processing.py --user ID_CLIENTE-1 --date_ini 2021-03-01 --date_fin 2021-03-26 --shape ID_CLIENTE-1
-
+# python sat_processing.py --date_ini 2021-03-26
 
 ### leer librerias
 import numpy as np
@@ -63,8 +63,8 @@ args = vars(ap.parse_args())
 #inicializacion de variables - fechas
 Date_Ini = (args["date_ini"]) 
 Date_Fin = (args["date_fin"]) 
-#Date_Ini= '2021-04-04'
-#Date_Fin= '2021-04-10'
+#Date_Ini= '2021-04-14'
+#Date_Fin= '2021-04-29'
 
 if Date_Ini == 'no':
     Date_Ini = (datetime.date.today()-datetime.timedelta(days=5)).strftime("%Y-%m-%d")
@@ -91,14 +91,6 @@ folder_name = (args["shape"])
 #folder_name = 'ID_CLIENTE-1' 'external_shape' #'no'
 
 
-'''
-### si el usuario se deifnio, tomarlo del string tomando la segunda parte despues de /
-if user_analysis != 'no' : 
-    try:
-        analysis_area = user_analysis.split("/")[1]
-    except:
-        analysis_area = user_analysis
-'''
 
 
 ''' automatizado
@@ -127,7 +119,17 @@ if user_analysis == 'auto':
         analysis_area = cliente
         user_analysis = cliente
         folder_name = cliente
+        '''
+        aqui deberia seguir todo el loop, para cada cliente, cada finca, (si un cliente tiene fincas alejadas?)
+        '''
 
+'''
+else: #user_analysis != 'no' : 
+    try:
+        analysis_area = user_analysis.split("/")[1]
+    except:
+        analysis_area = user_analysis
+'''
 
 ### definir constantes basicas para medidas
 # todo se hace con base 512, las nubes se descargan a 512pxl, mientras que las areas de descarga
@@ -152,8 +154,6 @@ for n in objetos:
 ###funcion para leer firebase
 # de aqui se leen los lotes del json, coordenadas, caja de coordenadas GPS, entre otros
 # si no se define usuario o fechas, estos se basaran en la informacion de Firebase 
-
-
 
 
 if folder_name != 'no': #si se define shape, es porque existe bigbox en cloud store, entonces descargar
@@ -187,7 +187,6 @@ crs cambiar a nuevo formato para evitar errores
 '''
 # el CRS y EPSG son terminos geo-espaciales, para definir referencia base de esfera a plano
 aoi.crs = {'init':'epsg:32618', 'no_defs': True}
-#aoi_universal= aoi.to_crs(4326)                                 #para API sentinel
 aoi_universal= aoi.to_crs("EPSG:4326") 
 
 # el footprint es para hallar imagenes satelitales que contengan esta area
@@ -301,6 +300,9 @@ if down_yes == 'yes':
     products_df = Sentinel_downloader.image_down(footprint, Date_Ini, Date_Fin, analysis_area,zipped_folder,unzipped_folder,lotes_uni,user_analysis,municipio, departamento)
     products_df['date'] = products_df['date'].astype(str)#.replace("-","")
     products_df['date'] = products_df['date'].str.split(' ').str[0].str.replace("-","")
+    '''
+    por qui podria ir la API para escribir lo que se descarga, o mas abajo
+    '''
     #products2 = products_df['date'].str.split(' ').str[0]
 else:
     products_df = pd.read_csv('../Data/Database/DB_downloaded_files.csv')
@@ -309,7 +311,7 @@ else:
     products_df['date'] = products_df['date'].str.split(' ').str[0].str.replace("-","")
 direcciones = Sentinel_downloader.get_routes(analysis_area,unzipped_folder)
 print(direcciones)
-
+print(products_df.loc[:,['file','date','mode']])
 
 ### Recortar y procesar imagenes satelitales
 output_folder='../Data/Output_Images/'
@@ -345,14 +347,7 @@ if local_files =='no':
             shutil.rmtree(unzipped_folder+analysis_area+"/"+file_name+"/", ignore_errors=True)
             continue
 
-        '''
-        for i in range(0,len(valid_dates)):
-            #date_msk = valid_dates.iloc[i,0].date() 
-            date_msk_1 = datetime.datetime.strptime(valid_dates[i][0], '%Y-%m-%d') #str(valid_dates.iloc[c,0]).split()[0]
-            date_msk_2 = datetime.datetime.strptime(valid_dates[i][1], '%Y-%m-%d')
-            if (date_obj >= date_msk_1 and date_obj <= date_msk_2):
-                ind_mask.append(i)
-        '''
+
         #list bands
         onlyfiles = [f for f in listdir(R10) if isfile(join(R10, f))]
         #review if date is in products_df and is contained
@@ -432,44 +427,11 @@ if local_files =='no':
     #processed_data = pd.read_csv (r'../Data/Database/DB_datos_proecsados.csv', index_col=0)   
     processed_df = pd.DataFrame(data={'user' : [user_analysis.split("/")[0]], 'terrain':[analysis_area], 'municipio':[municipio] , 'departamento':[departamento] ,'initial_date' : [Date_Ini] ,'final_date' : [Date_Fin], 'last_valid_date' : [date_max] , 'number_valid_date' : [len(direcciones)], 'number_analyzed_images': [len(direcciones)]  , 'processed_date' : [datetime.date.today()]})  #[valid_dates[-1][0]], [number_cld_analysis]  
     processed_df.to_csv (r'../Data/Database/DB_datos_proecsados.csv', index = True, header=False, mode='a')
+    '''
+    por aqui podria ir la API de lo que se descarga y procesa
+    '''
     shutil.rmtree(unzipped_folder+analysis_area+"/mosaic/", ignore_errors=True)    
 
-#local files para nubes /// muy raro usarlo
-'''
-elif local_files == 'local':
-    bands = ["B01.tif","B02.tif","B03.tif","B04.tif","B05.tif","B06.tif","B07.tif","B08.tif","B09.tif","B10.tif","B11.tif","B12.tif","B8A.tif","_cldmsk.tif"]
-    #list bands
-    onlyfiles = [f for f in listdir(output_folder+analysis_area) if isfile(join(output_folder+analysis_area, f))]
-    matching = [s for s in onlyfiles if any(s[-7:] ==  b for b in bands)]
-    dates = list(set([(m[:8]) for m in matching ]))      
-    for date in dates:
-        #calculate indexes
-        print("[INFO] Date to Analyze = {}".format(date))
-        meta, cld_pxl_count = Satellite_proc.band_calc(date, analysis_area,x_width,output_folder) #calculate NDVI, crop='grass'
-        matplotlib.pyplot.close("all")
-        #dataframe for best_date image
-        if count_of_clouds.empty:
-            count_of_clouds = pd.DataFrame(data={'date' : [date], 'clear_pxl_count':[cld_pxl_count]})
-        else:
-            count_of_clouds = count_of_clouds.append(pd.DataFrame(data={'date' : [date], 'clear_pxl_count':[cld_pxl_count]}))
-        
-        #database
-        if folder_name != "no":
-            analysis_date=date
-            size_flag, datag, short_ordenado, short_resume = Stats_charts.data_g(date,analysis_date, aoig_near, todos_lotes, output_folder, analysis_area) #//aoig_near
-            if size_flag:
-                print(date)
-            else:
-                pd.DataFrame(big_proto.append(datag )) 
-                resumen_bandas = pd.concat([resumen_bandas,short_resume])
-                table_bandas = pd.concat([table_bandas,short_ordenado])
-
-        print("[INFO] Date, user_analysis Analyzed = {} - {}".format(date,analysis_area))
-    #write log to DB at end of process
-    form_date = datetime.datetime.strptime(max(dates),'%Y%m%d').strftime('%d/%m/%Y %H:%M')
-    processed_df = pd.DataFrame(data={'user' : [user_analysis.split("/")[0]], 'terrain':[analysis_area], 'municipio':[municipio] , 'departamento':[departamento] ,'initial_date' : [Date_Ini] ,'final_date' : [Date_Fin], 'last_valid_date' : [form_date], 'number_valid_date' : [len(dates)], 'number_analyzed_images': [len(dates)] , 'processed_date' : [datetime.date.today()]})    
-    processed_df.to_csv (r'../Data/Database/DB_datos_proecsados.csv', index = True, header=False, mode='a')
-'''
         
 #finalizar contadores y obtener tiempo total
 end = time.time()
@@ -517,11 +479,13 @@ if folder_name != "no": #shapefile fue provisto entonces
         to_del=[]
         for k,v in data_row.items():
             if type(v) == float and math.isnan(v):
-                print(k,'delete')
+                #print(k,'delete')
                 to_del.append(k)
         for n in to_del:
             data_row.pop(n)
-        API_usage.post_lote_var(token,data_row)
+        #API_usage.post_lote_var(token,data_row)
+    #API to upload list of dicts
+    API_usage.post_lote_var(token,data_dict)
     end = time.time()
     print(end - start) 
     
@@ -545,9 +509,10 @@ if folder_name != "no": #shapefile fue provisto entonces
     resumen_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_vertical_lotes_medidas'+Date_Fin+'.csv', index = True, header=True)
     print("[INFO] data table exported as CSV")
 
-    
+'''    
 #pasar esto a una funcion.
 #si se definir external shapes, no hacer esto. 
+'''
 if folder_name == "no":
     #contornos
     if local_files =='no':
@@ -615,20 +580,6 @@ for data_i in dates_in : #cambiar por list_dates
 end = time.time()
 print(end - start) 
 
-'''
-    if folder_name == "no": #no shapefile passed
-        todos_lotes = aoig_near
-        size_flag, datag, short_ordenado, short_resume = Stats_charts.data_g(data_i,analysis_date, aoig_near, todos_lotes, output_folder,analysis_area) #//aoig_near
-        if size_flag:
-            print(data_i)
-        else:
-            pd.DataFrame(big_proto.append(datag )) 
-            resumen_bandas = pd.concat([resumen_bandas,short_resume])
-            table_bandas = pd.concat([table_bandas,short_ordenado])
-    #move NDVI images from output to firebase folder
-    #shutil.move(output_folder+analysis_area+'/'+ data_i+"NDVI_Lote_&_Neighbors"+str(cnt)+".png", firebase_folder+analysis_area+'/'+ data_i+"NDVI_Lote_&_Neighbors"+str(cnt)+".png")
-    #shutil.move(output_folder+analysis_area+'/'+ data_i+"_NDVI_analysis_lotes.png", firebase_folder+analysis_area+'/'+ data_i+"_NDVI_analysis_lotes.png")
-'''
 
 
 
@@ -638,52 +589,8 @@ if folder_name == "no":
     resumen_bandas.to_csv (r'../Data/Database/'+analysis_area+'/resumen_vertical_lotes_medidas'+Date_Fin+'.csv', index = True, header=True)
     print("[INFO] data table exported as CSV")
 
+   
 
-### graficas estadistocas /// creo que esto no se esta usano, y se podria hacer mejor en el tablero o app
-'''
-big_proto_F = pd.concat(big_proto, axis = 0)
-big_proto_F = big_proto_F.sort_values(by=['date' , 'poly'])
-plgn_1 = big_proto_F[big_proto_F['poly'].isin([1])]
-seasonplot = sns.boxplot(x="date", y="data_pixel",data=plgn_1, palette="Set3")
-plt.title('polygon:'+'1')
-plt.setp(seasonplot.get_xticklabels(), rotation=80)
-plt.savefig(folder_out[:-8]+'NDVI_Lote_Over_Time.png',bbox_inches='tight',dpi=200) #Esto va al firebase
-plt.clf()
-
-#otras graficas
-cnt = 0
-for ld in list_dates:
-    #ld = '20200102'
-    cnt = cnt + 1
-    ssn_1 = big_proto_F[big_proto_F['date'].isin([ld])]
-    # plgnplot = None
-    plgnplot = sns.boxplot(x="poly", y="data_pixel",
-                           data=ssn_1, palette="Set3")
-    plt.title(ld)
-    plt.savefig(firebase_folder+analysis_area+'/'+'Lotes_Boxplot'+str(cnt)+'.png',bbox_inches='tight',dpi=200) #Esto va al firebase
-    plt.clf()
-
-all_plot = sns.lineplot(x="date", y="data_pixel",hue = 'poly' ,
-                            err_style="bars" , data=big_proto_F, palette="Set3")
-plt.setp(all_plot.get_xticklabels(), rotation=80)
-plt.clf()
-    
-median_array = big_proto_F.groupby(['date', 'poly'])[['data_pixel']].median()
-median_array.reset_index(inplace=True)
-median_array  = median_array[median_array['poly'].isin([1,2,3,4,5,6,7,8,9,10,11])]
-
-#median_array  = median_array[median_array['poly'].isin([0])]
-median_plot = sns.lineplot(x="date", y="data_pixel", hue = 'poly',
-                               data=median_array, palette="Set3")
-plt.setp(median_plot.get_xticklabels(), rotation=80)
-plt.savefig(folder_out[:-8]+'NDVI_Lotes_MedianOVT.png',bbox_inches='tight',dpi=200) # esto al firebas
-plt.clf()
-'''    
-
-### upload a firebase
-#esto se podria quitar, y dejar solo en google cloud store
-#Upload_fire.upload_image(firebase_folder,analysis_area,user_analysis)
-#print("[INFO] images uploaded to Firebase")
 '''
 al final deberia hacer un post o get, para activar pub/sub de GCP
 correr codigo fuente linux, para mover archivos al storage

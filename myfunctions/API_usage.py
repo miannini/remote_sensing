@@ -119,7 +119,7 @@ class API_usage:
         path = 'Wr_lotes_quimicos/'
         response = requests.post(url+path, json = data_row ,headers=hed)
         print(response.status_code)
-        print(response.json())
+        #print(response.json())
     
         
         
